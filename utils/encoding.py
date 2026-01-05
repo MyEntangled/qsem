@@ -21,4 +21,12 @@ def chebyshev_encoding(deg, x):
 
     tau[0] *= scale
     tau[1:] *= scale * np.sqrt(2)
+
+    #print("Norm of Chebyshev encoding vector:", np.linalg.norm(tau))
     return tau
+
+if __name__ == "__main__":
+    deg = 5
+    x_list = chebyshev_nodes(deg)
+    tau_list = np.linalg.norm([chebyshev_encoding(deg, x) for x in x_list])
+    print(tau_list.shape)
