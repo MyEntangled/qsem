@@ -48,12 +48,12 @@ def solve_ODE(deg, deg_out, m, l, x_z=None, x_m=None):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    m, l = 1, 6
+    m, l = 1, 5
     n = 5
     deg = 2**n-1
     deg_out = 2**(n+1) - 1
 
-    psi_sol = solve_ODE(deg,deg_out,m=m,l=l,x_m=None,x_z=[0])
+    psi_sol = solve_ODE(deg,deg_out,m=m,l=l,x_m=[0],x_z=[-1,1])
     print("Solution coefficients (Chebyshev basis):")
     print(psi_sol)
 
