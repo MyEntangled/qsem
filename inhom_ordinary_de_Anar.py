@@ -45,15 +45,19 @@ def solve_ODE(deg, deg_out, x_s, y_s, x_m, coeffs):
 #     Bm_M = Bm @ M1
 #     H += Bm_M.T @ Bm_M
 
+#     epsilon = 1e-16
+#     H += epsilon*np.identity(H.shape[0], dtype=float)
 
     eigvals, eigvecs = np.linalg.eigh(H)
     psi_sol = eigvecs[:, 0]
+
     print("Spectral gap:", eigvals[1] - eigvals[0])
+    print(eigvals[0])
     return psi_sol
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    n = 7
+    n = 6
     deg = 2**n-1
     deg_out = 2**(n+1) - 1
 

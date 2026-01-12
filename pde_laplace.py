@@ -35,6 +35,7 @@ def solve_PDE(deg, x_z=None, y_z=None, x_m=None, y_m=None):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
+
     n = 3
     deg = 2**n-1
     x_z = [-1.0,1.0]
@@ -70,7 +71,7 @@ if __name__ == "__main__":
     X, Y = np.meshgrid(x_plot,y_plot)
     fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(111, projection='3d')
-    surf = ax.plot_surface(X, Y, f_plot.T, cmap='viridis', edgecolor='none')
+    surf = ax.plot_surface(X, Y, f_plot.T, cmap='twilight_shifted', vmin=-1, vmax=1, edgecolor='none', antialiased=False)
     ax.set_title('Approximation f_plot')
     ax.set_xlabel('x')
     ax.set_ylabel('y')
@@ -80,7 +81,7 @@ if __name__ == "__main__":
 
     fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(111, projection='3d')
-    surf = ax.plot_surface(X, Y, f_true.T, cmap='viridis', edgecolor='none')
+    surf = ax.plot_surface(X, Y, f_true.T, cmap='twilight_shifted', vmin=-1, vmax=1, edgecolor='none', antialiased=False)
     ax.set_title('Analytical f_true')
     ax.set_xlabel('x')
     ax.set_ylabel('y')
@@ -90,12 +91,12 @@ if __name__ == "__main__":
 
     fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(111, projection='3d')
-    surf = ax.plot_surface(X, Y, np.abs(f_plot-f_true).T, cmap='viridis', edgecolor='none')
+    surf = ax.plot_surface(X, Y, np.abs(f_plot-f_true).T, cmap='twilight_shifted', vmin=-1, vmax=1, edgecolor='none', antialiased=False)
     ax.set_title('Error abs(f_plot-f_true)')
     ax.set_xlabel('x')
     ax.set_ylabel('y')
     ax.set_zlabel('abs(f_plot-f_true)')
-    ax.set_zlim(0, 1)
+    ax.set_zlim(-1, 1)
     fig.colorbar(surf, shrink=0.6, aspect=10)
     plt.tight_layout()
 
