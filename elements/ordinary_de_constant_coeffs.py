@@ -1,20 +1,39 @@
 import numpy as np
 from src.utils import derivative_matrix, boundary_matrix, encoding
 
-
-def solve_ODE(deg, coeffs, x_z):
-    GT = derivative_matrix.chebyshev_diff_matrix(deg=deg)
-
-    A = coeffs[0] * GT @ GT + coeffs[1] * GT + coeffs[2] * np.eye(deg+1)
-    B = boundary_matrix.zero_value_boundary_matrix(deg=deg, x_z=x_z)
+def solve_ODE(deg, coeffs, x_z, x_m, map_coeffs):
+    G_T = derivative_matrix.chebyshev_diff_matrix(deg=deg)
     Cneg = boundary_matrix.zero_value_boundary_matrix(deg=deg, x_z=-1)
     Cpos = boundary_matrix.zero_value_boundary_matrix(deg=deg, x_z=1)
-#     B_GT = B @ GT
+    GT_Cneg = Cneg @ G_T
+    GT_Cpos = Cpos @ G_T
+    T_Cneg = Cneg.T @ Cneg
+    T_Cpos = Cpos.T @ Cpos
+    T_Cnegpos = Cneg.T @ Cpos
+    T_Cposneg = Cpos.T @ Cneg
+    T_GT_Cneg = GT_Cneg.T @ GT_Cneg
+    T_GT_Cpos = GT_Cpos.T @ GT_Cpos
+    T_GT_Cnegpos = GT_Cneg.T @ GT_Cpos
+    T_GT_Cposneg = GT_Cpos.T @ GT_Cneg
 
-    T_A = A.T @ A # Made a mistake. Matrix A is different for each element,
-                  # and it depends on the mapping function.
-    T_B = B.T @ B
-    H = np.block([[T_A+T_B+Cpos, -Cneg],[-Cpos, Cneg+T_A]])
+    T_As = []
+    for map_coeff in map_coeffs:
+        a = map_coeff[0]
+        A = a*a*coeffs[0]*G_T@G_T + a*coeffs[1]*G_T + coeffs[2]*np.eye(deg+1)
+        T_A = A.T @ A
+        T_As.append(T_A)
+
+    if x_z != None:
+        B_z = boundary_matrix.zero_value_boundary_matrix(deg=deg, x_z=-1)
+        T_Bz = B_z.T @ B_z
+
+    H = np.block([[T_As[0]+T_Cpos+T_GT_Cpos+T_Bz, -T_Cposneg-T_GT_Cposneg, np.zeros_like(T_Bz)], 
+                  [-T_Cnegpos-T_GT_Cnegpos, T_Cneg+T_GT_Cneg+T_As[1]+T_Cpos+T_GT_Cpos, -T_Cposneg-T_GT_Cposneg],
+                  [np.zeros_like(T_Bz), -T_Cnegpos-T_GT_Cnegpos, T_Cneg+T_GT_Cneg+T_As[2]]])
+
+#     if x_m != None:
+#         B_m = boundary_matrix.zero_derivative_boundary_matrix(deg=deg, x_m=x_m)
+#         T_Bm = B_m.T @ B_m
 
     eigvals, eigvecs = np.linalg.eigh(H)
     psi_sol = eigvecs[:, 0]
@@ -23,51 +42,50 @@ def solve_ODE(deg, coeffs, x_z):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-#     N = 2 # Number of elements
+    N = 3
+    n = 3
+    deg = 2**n - 1
+    coeffs = (1.0,4.0,4.0)
+    x_z, x_m = -1, None
 
-    n = 3 # Number of qubits
-    deg = 2**n - 1 # Degree of Chebyshev Polynomials
-    coeffs = (1.0, 4.0, 4.0)
-    x_z = 0
-    x_s = 0.5
+    true_sol = lambda x: 0.5 * (1+x) * np.exp(-2*x)
+#     true_sol = lambda x: 0.25 * (1+x) * np.exp(1-x)
+    x_s = -0.5
+    f_s = true_sol(x_s)
 
-    psi_sol = solve_ODE(deg,coeffs,x_z)
-    psi_1 = psi_sol[:deg+1]
-    psi_2 = psi_sol[deg+1:]
-    psis = (psi_1,psi_2)
-    intervals = ([-1,0],[0,1])
+    nodes = np.linspace(-1,1,N+1)
+    intervals = np.column_stack((nodes[:-1],nodes[1:]))
+    map_coeffs = np.array([2/(intervals[:,1]-intervals[:,0]),
+        -(intervals[:,1]+intervals[:,0])/(intervals[:,1]-intervals[:,0])]).T
 
-    sol = lambda x: 0.5 * (1 + x) * np.exp(-2*x)
+    psi_sol = solve_ODE(deg,coeffs,x_z,x_m,map_coeffs)
+    psis = psi_sol.reshape(N,deg+1)
 
-    def map(x,interval):
-        return (2*x - interval[1] - interval[0])/(interval[1]-interval[0])
+    def map(x,map_coeff):
+        return map_coeff[0]*x + map_coeff[1]
 
     def f(x):
         for i, interval in enumerate(intervals):
             if interval[0] <= x <= interval[1]:
-                return np.dot(encoding.chebyshev_encoding(deg, map(x,interval)),
-                              psis[i])
+                return np.dot(encoding.chebyshev_encoding(deg,
+                                            map(x,map_coeffs[i])), psis[i])
 
-    s_eta = sol(x_s) / f(x_s)
+    s_eta = f_s / f(x_s)
+    print(s_eta**2, "\n")
 
-#     psi_sol = solve_ODE(deg,coeffs,x_z,N)
-#     print("Solution coefficients (Chebyshev basis):")
-#     print(psi_sol)
-# 
-#     s_eta = data_s[1] / np.dot(encoding.chebyshev_encoding(deg=deg, x=data_s[0]), psi_sol)
-#     print(s_eta**2, "\n")
-# 
     # Plot the solution
     x_plot = np.linspace(-1, 1, 100)
     f_plot = []
     f_true = []
-    for x in x_plot:
-        f_plot.append(s_eta * f(x))
-        f_true.append(sol(x))
-    plt.plot(x_plot, f_plot)
-    plt.plot(x_plot, f_true)
-    plt.title("Solution to ODE")
+    for xj in x_plot:
+        tau = encoding.chebyshev_encoding(deg=deg, x=xj)
+        f_plot.append(s_eta * f(xj))
+        f_true.append(true_sol(xj))
+    plt.plot(x_plot, f_plot, c='red', label=r'$f^*_{Q}(x)$')
+    plt.plot(x_plot, f_true, '--', label=r'$f_{true}(x)$')
+    plt.title(f"Solution to ODE: n={n}")
     plt.xlabel("x")
     plt.ylabel("f(x)")
+    plt.legend()
     plt.grid()
     plt.show()
