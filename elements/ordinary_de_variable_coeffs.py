@@ -1,7 +1,6 @@
 import numpy as np
 from src.utils import derivative_matrix, boundary_matrix, encoding
 
-
 def solve_ODE(deg, N, coeffs, map_coeffs_a, xi_z=None, xi_m=None):
     GT = derivative_matrix.chebyshev_diff_matrix(deg=deg)
     Cneg = boundary_matrix.zero_value_boundary_matrix(deg=deg, x_z=-1)
@@ -24,7 +23,10 @@ def solve_ODE(deg, N, coeffs, map_coeffs_a, xi_z=None, xi_m=None):
         T_A = A.T @ A
         H[i*(deg+1):(i+1)*(deg+1),
           i*(deg+1):(i+1)*(deg+1)] = T_Cneg+T_Cneg_GT+T_A+T_Cpos+T_Cpos_GT
-        print(H)
+
+    H[0:deg+1,0:deg+1] -= T_Cneg+T_Cneg_GT
+    H[(N-1)*(deg+1):N*(deg+1),
+      (N-1)*(deg+1):N*(deg+1)] -= T_Cpos+T_Cpos_GT
 
     if xi_z != None:
         x_z, i = xi_z[0], xi_z[1]
@@ -53,24 +55,41 @@ def solve_ODE(deg, N, coeffs, map_coeffs_a, xi_z=None, xi_m=None):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    N = 2
+    N = 3
     n = 3
     deg = 2**n - 1
-    coeffs = (1.0,4.0,4.0)
-    x_z, x_m = -1, None
 
+### FIG 3. b)
+    coeffs = (1.0,4.0,4.0)
     true_sol = lambda x: 0.5 * (1+x) * np.exp(-2*x)
     x_s = -0.5
     f_s = true_sol(x_s)
+    x_z, x_m = -1, None
+
+### FIG 3. c)
+#     coeffs = (1.0,-2.0,-3.0)
+#     true_sol = lambda x: 0.25 * (np.exp(3*x) - np.exp(-x))
+#     x_s = 0.5
+#     f_s = true_sol(x_s)
+#     x_z, x_m = 0, None
+
+### FIG 3. d)
+#     coeffs = (1.0,5.0,400.0)
+#     true_sol = lambda x: np.exp(-5*x/2) * (np.cos(15*np.sqrt(7)*x/2) +
+#                                 np.sqrt(7)*np.sin(15*np.sqrt(7)*x/2)/21)
+#     x_s = 0
+#     f_s = true_sol(x_s)
+#     x_z, x_m = None, 0
 
     nodes = np.linspace(-1,1,N+1)
     intervals = np.column_stack((nodes[:-1],nodes[1:]))
     map_coeffs = np.array([2/(intervals[:,1]-intervals[:,0]),
         -(intervals[:,1]+intervals[:,0])/(intervals[:,1]-intervals[:,0])]).T
     i_z = np.searchsorted(nodes[:-1],x_z,'right')-1
-#     i_m = np.searchsorted(nodes[:-1],x_m)-1
+#     i_m = np.searchsorted(nodes[:-1],x_m,'right')-1
 
-    psi_sol = solve_ODE(deg, N, coeffs, map_coeffs[:,0], (x_z,i_z))
+    psi_sol = solve_ODE(deg, N, coeffs, map_coeffs[:,0], (x_z,i_z), None)
+#     psi_sol = solve_ODE(deg, N, coeffs, map_coeffs[:,0], None, (x_m,i_m))
     psis = psi_sol.reshape(N,deg+1)
 
     def map(x,map_coeff):
@@ -93,7 +112,7 @@ if __name__ == "__main__":
 # 
 
     # Plot the solution
-    x_plot = np.linspace(-1, 1, 100)
+    x_plot = np.linspace(-1, 1, 1000)
     f_plot = []
     f_true = []
     for xj in x_plot:
