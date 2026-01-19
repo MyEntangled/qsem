@@ -55,23 +55,23 @@ def solve_ODE(deg, N, coeffs, map_coeffs_a, xi_z=None, xi_m=None):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    N = 3
-    n = 3
+    N = 6
+    n = 4
     deg = 2**n - 1
 
 ### FIG 3. b)
-    coeffs = (1.0,4.0,4.0)
-    true_sol = lambda x: 0.5 * (1+x) * np.exp(-2*x)
-    x_s = -0.5
-    f_s = true_sol(x_s)
-    x_z, x_m = -1, None
+#     coeffs = (1.0,4.0,4.0)
+#     true_sol = lambda x: 0.5 * (1+x) * np.exp(-2*x)
+#     x_s = -0.5
+#     f_s = true_sol(x_s)
+#     x_z, x_m = -1, None
 
 ### FIG 3. c)
-#     coeffs = (1.0,-2.0,-3.0)
-#     true_sol = lambda x: 0.25 * (np.exp(3*x) - np.exp(-x))
-#     x_s = 0.5
-#     f_s = true_sol(x_s)
-#     x_z, x_m = 0, None
+    coeffs = (1.0,-2.0,-3.0)
+    true_sol = lambda x: 0.25 * (np.exp(3*x) - np.exp(-x))
+    x_s = 0.5
+    f_s = true_sol(x_s)
+    x_z, x_m = 0, None
 
 ### FIG 3. d)
 #     coeffs = (1.0,5.0,400.0)
@@ -85,15 +85,18 @@ if __name__ == "__main__":
     intervals = np.column_stack((nodes[:-1],nodes[1:]))
     map_coeffs = np.array([2/(intervals[:,1]-intervals[:,0]),
         -(intervals[:,1]+intervals[:,0])/(intervals[:,1]-intervals[:,0])]).T
+
+    def map(x,map_coeff):
+        return map_coeff[0]*x + map_coeff[1]
+
     i_z = np.searchsorted(nodes[:-1],x_z,'right')-1
+    x_z = map(x_z,map_coeffs[i_z])
 #     i_m = np.searchsorted(nodes[:-1],x_m,'right')-1
+#     x_m = map(x_m,map_coeffs[i_m])
 
     psi_sol = solve_ODE(deg, N, coeffs, map_coeffs[:,0], (x_z,i_z), None)
 #     psi_sol = solve_ODE(deg, N, coeffs, map_coeffs[:,0], None, (x_m,i_m))
     psis = psi_sol.reshape(N,deg+1)
-
-    def map(x,map_coeff):
-        return map_coeff[0]*x + map_coeff[1]
 
     def f(x):
         i = np.searchsorted(nodes[:-1],x,'right')-1
@@ -111,6 +114,9 @@ if __name__ == "__main__":
         tau = encoding.chebyshev_encoding(deg=deg, x=xj)
         f_plot.append(s_eta * f(xj))
         f_true.append(true_sol(xj))
+    L2_err = np.sqrt(2*np.sum(np.power(np.array(f_plot)-np.array(f_true),2))/1000)
+    print(f"L2 error: {L2_err}")
+
     plt.plot(x_plot, f_plot, c='red', label=r'$f^*_{Q}(x)$')
     plt.plot(x_plot, f_true, '--', label=r'$f_{true}(x)$')
     plt.title(f"Solution to ODE: n={n}")
