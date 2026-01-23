@@ -42,6 +42,7 @@ def solve_ODE(deg, deg_out, m, l, x_z=None, x_m=None):
             H += Bm_M_GT.T @ Bm_M_GT
 
     eigvals, eigvecs = np.linalg.eigh(H)
+    print(eigvals)
     psi_sol = eigvecs[:, 0]
     print("Spectral gap:", eigvals[1] - eigvals[0])
     return psi_sol

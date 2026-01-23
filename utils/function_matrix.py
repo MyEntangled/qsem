@@ -1,6 +1,11 @@
 import numpy as np
 from src.utils import derivative_matrix, encoding
 
+def complex_step_derivative(func, h=1e-20):
+    """
+    Computes the
+    """
+
 def zero_value_boundary_matrix(deg, x_z):
     """
     Computes the boundary matrix B(x_z) such that:

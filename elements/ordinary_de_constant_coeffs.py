@@ -17,6 +17,7 @@ def solve_ODE(deg, N, coeffs, map_coeffs_a, xi_z=None, xi_m=None):
     T_Cposneg_GT = Cpos_GT.T @ Cneg_GT
 
     H = np.zeros((N*(deg+1),N*(deg+1)))
+    print(H.shape)
 
     for i,a in enumerate(map_coeffs_a):
         A = a*a*coeffs[0]*GT@GT + a*coeffs[1]*GT + coeffs[2]*np.eye(deg+1)
@@ -55,9 +56,10 @@ def solve_ODE(deg, N, coeffs, map_coeffs_a, xi_z=None, xi_m=None):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    N = 6
-    n = 4
+    N = 10
+    n = 2
     deg = 2**n - 1
+    print(deg)
 
 ### FIG 3. b)
 #     coeffs = (1.0,4.0,4.0)

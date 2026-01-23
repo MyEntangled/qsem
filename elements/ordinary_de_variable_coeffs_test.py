@@ -1,30 +1,17 @@
 import numpy as np
-from src.utils import derivative_matrix, boundary_matrix, encoding, multiply_matrix
+from src.utils import derivative_matrix, boundary_matrix, encoding, multiply_matrix, continuity_matrix
 from scipy.special import lpmv
 
 def solve_ODE(deg, deg_out, N, l, m, map_coeffs, xi_z=None, xi_m=None):
     GT = derivative_matrix.chebyshev_diff_matrix(deg=deg)
     GT2 = GT@GT
-    Cneg = boundary_matrix.zero_value_boundary_matrix(deg=deg, x_z=-1)
-    Cpos = boundary_matrix.zero_value_boundary_matrix(deg=deg, x_z=1)
-    Cneg_GT = Cneg @ GT
-    Cpos_GT = Cpos @ GT
-    T_Cneg = Cneg.T @ Cneg
-    T_Cpos = Cpos.T @ Cpos
-    T_Cnegpos = Cneg.T @ Cpos
-    T_Cposneg = Cpos.T @ Cneg
-    T_Cneg_GT = Cneg_GT.T @ Cneg_GT
-    T_Cpos_GT = Cpos_GT.T @ Cpos_GT
-    T_Cnegpos_GT = Cneg_GT.T @ Cpos_GT
-    T_Cposneg_GT = Cpos_GT.T @ Cneg_GT
-
     M1 = multiply_matrix.M_x_power(deg, 0, deg_out=deg_out)
     Mx = multiply_matrix.M_x_power(deg, 1, deg_out=deg_out)
     Mx2 = multiply_matrix.M_x_power(deg, 2, deg_out=deg_out)
     Mx3 = multiply_matrix.M_x_power(deg, 3, deg_out=deg_out)
     Mx4 = multiply_matrix.M_x_power(deg, 4, deg_out=deg_out)
 
-    H = np.zeros((N*(deg+1),N*(deg+1)))
+    Am = np.zeros((N*(deg+1),N*(deg+1)))
 
     for i,map_coeff in enumerate(map_coeffs):
         a, b = map_coeff[0], map_coeff[1]
@@ -38,61 +25,64 @@ def solve_ODE(deg, deg_out, N, l, m, map_coeffs, xi_z=None, xi_m=None):
                        2*b*l*(l+1)*Mx - l*(l+1)*Mx2)
             A = termGT2@GT2 + termGT@GT + term
         T_A = A.T @ A
-        H[i*(deg+1):(i+1)*(deg+1),
-          i*(deg+1):(i+1)*(deg+1)] = T_Cneg+T_Cneg_GT+T_A+T_Cpos+T_Cpos_GT
 
-    H[0:deg+1,0:deg+1] -= T_Cneg+T_Cneg_GT
-    H[(N-1)*(deg+1):N*(deg+1),
-      (N-1)*(deg+1):N*(deg+1)] -= T_Cpos+T_Cpos_GT
+        Am[i*(deg+1):(i+1)*(deg+1),
+          i*(deg+1):(i+1)*(deg+1)] = T_A
 
     if xi_z != None:
         x_z, i = xi_z[0], xi_z[1]
         B_z = boundary_matrix.zero_value_boundary_matrix(deg=deg, x_z=x_z)
         T_Bz = B_z.T @ B_z
-        H[i*(deg+1):(i+1)*(deg+1),
+
+        Am[i*(deg+1):(i+1)*(deg+1),
           i*(deg+1):(i+1)*(deg+1)] += T_Bz
 
     if xi_m != None:
         x_m, i = xi_m[0], xi_m[1]
         B_m = boundary_matrix.zero_derivative_boundary_matrix(deg=deg, x_m=x_m)
         T_Bm = B_m.T @ B_m
-        H[i*(deg+1):(i+1)*(deg+1),
+
+        Am[i*(deg+1):(i+1)*(deg+1),
           i*(deg+1):(i+1)*(deg+1)] += T_Bm
 
-    for i in range(N-1):
-        H[i*(deg+1):(i+1)*(deg+1),
-          (i+1)*(deg+1):(i+2)*(deg+1)] = -T_Cposneg -T_Cposneg_GT
-        H[(i+1)*(deg+1):(i+2)*(deg+1),
-          i*(deg+1):(i+1)*(deg+1)] = -T_Cnegpos -T_Cnegpos_GT
- 
+#     print(np.linalg.norm(Am@C0 - C0@Am))
+#     print(np.linalg.norm(Am@C1 - C1@Am))
+#     print(np.linalg.norm(C0@C1 - C1@C0))
+
+    C0 = continuity_matrix.generate_C0(N,deg)
+    C1 = continuity_matrix.generate_C1(N,deg)
+
+    H = Am + 1000*C0@C0 + 1000*C1@C1
+
     eigvals, eigvecs = np.linalg.eigh(H)
+#     print(eigvals[0])
     psi_sol = eigvecs[:, 0]
     print("Spectral gap:", eigvals[1] - eigvals[0])
     return psi_sol
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    N = 1
-    n = 5
+    N = 40
+    n = 2
     deg = 2**n - 1
     deg_out = 2**(n+1) - 1
 
 ### FIG 4.
-    m, l = 1, 5
+    m, l = 0, 5
     true_sol = lambda x: lpmv(m,l,x)
-    x_s = 0.25
+    x_s = 1/3
     f_s = true_sol(x_s)
-    x_z, x_m = None, 0
+    x_z, x_m = 0, None
 
     nodes = np.linspace(-1,1,N+1)
     intervals = np.column_stack((nodes[:-1],nodes[1:]))
     map_coeffs = np.array([2/(intervals[:,1]-intervals[:,0]),
         -(intervals[:,1]+intervals[:,0])/(intervals[:,1]-intervals[:,0])]).T
-#     i_z = np.searchsorted(nodes[:-1],x_z,'right')-1
-    i_m = np.searchsorted(nodes[:-1],x_m,'right')-1
+    i_z = np.searchsorted(nodes[:-1],x_z,'right')-1
+#     i_m = np.searchsorted(nodes[:-1],x_m,'right')-1
 
-#     psi_sol = solve_ODE(deg, deg_out, N, l, m, map_coeffs, (x_z,i_z), None)
-    psi_sol = solve_ODE(deg, deg_out, N, l, m, map_coeffs, None, (x_m,i_m))
+    psi_sol = solve_ODE(deg, deg_out, N, l, m, map_coeffs, (x_z,i_z), None)
+#     psi_sol = solve_ODE(deg, deg_out, N, l, m, map_coeffs, None, (x_m,i_m))
     psis = psi_sol.reshape(N,deg+1)
 
     def map(x,map_coeff):
@@ -107,7 +97,7 @@ if __name__ == "__main__":
     print(s_eta**2, "\n")
 
     # Plot the solution
-    x_plot = np.linspace(-1, 1, 1000)
+    x_plot = np.linspace(-1, 1, 5000)
     f_plot = []
     f_true = []
     for xj in x_plot:
