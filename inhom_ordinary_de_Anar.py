@@ -1,7 +1,7 @@
 import numpy as np
 import scipy as sp
 import math
-from src.utils import encoding, derivative_matrix, boundary_matrix, multiply_matrix
+from utils import encoding, derivative_matrix, boundary_matrix, multiply_matrix
 
 def solve_ODE(deg, deg_out, x_s, y_s, x_m, coeffs):
     GT = derivative_matrix.chebyshev_diff_matrix(deg=deg)

@@ -1,5 +1,5 @@
 import numpy as np
-from src.utils import derivative_matrix, encoding
+from utils import derivative_matrix, encoding
 
 def complex_step_derivative(func, h=1e-20):
     """

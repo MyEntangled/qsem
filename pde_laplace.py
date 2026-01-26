@@ -1,5 +1,5 @@
 import numpy as np
-from src.utils import derivative_matrix, boundary_matrix, encoding
+from utils import derivative_matrix, boundary_matrix, encoding
 
 def solve_PDE(deg, x_z=None, y_z=None, x_m=None, y_m=None):
     GT = derivative_matrix.chebyshev_diff_matrix(deg=deg)

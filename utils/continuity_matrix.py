@@ -1,5 +1,5 @@
 import numpy as np
-from src.utils import boundary_matrix, multiply_matrix, derivative_matrix
+from utils import boundary_matrix, multiply_matrix, derivative_matrix
 
 def generate_C0(N: int, deg: int, deg_out: int | None = None):
     """

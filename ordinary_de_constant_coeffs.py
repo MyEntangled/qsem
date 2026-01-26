@@ -1,5 +1,5 @@
 import numpy as np
-from src.utils import derivative_matrix, boundary_matrix, encoding
+from utils import derivative_matrix, boundary_matrix, encoding
 
 
 def solve_ODE(deg, a,b,c,x_z):

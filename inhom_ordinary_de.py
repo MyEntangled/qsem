@@ -1,6 +1,6 @@
 import numpy as np
 import scipy as sp
-from src.utils import encoding, derivative_matrix, boundary_matrix, multiply_matrix
+from utils import encoding, derivative_matrix, boundary_matrix, multiply_matrix
 
 def solve_ODE(deg, deg_out, x_s, y_s, x_m):
     GT = derivative_matrix.chebyshev_diff_matrix(deg=deg)
@@ -55,6 +55,7 @@ if __name__ == "__main__":
         tau_x = encoding.chebyshev_encoding(deg=deg, x=x)
         f_x = s_eta * np.dot(tau_x, psi_sol)
         f_plot.append(f_x)
+    print(np.linalg.norm(f_plot - sol(x_plot)) / np.linalg.norm(sol(x_plot)))
     f_plot = np.array(f_plot)
     plt.plot(x_plot, f_plot, label='Quantum ODE Solver', color='blue')
     plt.plot(x_plot, sol(x_plot), label='Exact Solution', linestyle='dashed', color='red')
@@ -63,4 +64,5 @@ if __name__ == "__main__":
     plt.title('Solution of ODE using Quantum Algorithm')
     plt.legend()
     plt.grid()
+    plt.savefig("test.png")
     plt.show()

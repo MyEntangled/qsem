@@ -1,5 +1,5 @@
 import numpy as np
-from src.utils import derivative_matrix, encoding
+from utils import derivative_matrix, encoding
 
 def zero_value_boundary_matrix(deg, x_z):
     """

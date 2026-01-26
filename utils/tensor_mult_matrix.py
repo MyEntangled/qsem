@@ -1,5 +1,5 @@
 import numpy as np
-from src.utils import multiply_matrix
+from utils import multiply_matrix
 
 def get_weight(k: int, deg: int) -> float:
     """

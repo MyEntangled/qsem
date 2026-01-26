@@ -1,7 +1,7 @@
 from typing import Iterable
 
 import numpy as np
-from src.utils import encoding, derivative_matrix, boundary_matrix, multiply_matrix
+from utils import encoding, derivative_matrix, boundary_matrix, multiply_matrix
 from scipy.special import lpmv
 
 def solve_ODE(deg, deg_out, m, l, x_z=None, x_m=None):
