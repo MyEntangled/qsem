@@ -15,6 +15,7 @@ def solve_ODE(deg, a,b,c,x_z):
     H = T_A + T_B
     eigvals, eigvecs = np.linalg.eigh(H)
     psi_sol = eigvecs[:, 0]
+    print("Ground State Energy:", eigvals[0])
     print("Spectral gap:", eigvals[1] - eigvals[0])
     return psi_sol
 
