@@ -227,6 +227,6 @@ if __name__ == "__main__":
     ax[1,1].legend()
     ax[1,1].grid()
     plt.tight_layout()
-    plt.savefig('beam_deflection_working.png')
+    plt.savefig('beam_deflection_with_linear_system.png')
     plt.show()
     plt.close()
