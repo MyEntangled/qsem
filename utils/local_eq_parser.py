@@ -147,7 +147,7 @@ if __name__ == "__main__":
     lhs = (f ** 2 * d2) + (2 * f * d1 ** 2) - f ** 3 + sp.sin(x)
     #d / dx(x ^ 2 * u') + (x^2-1)*(u') ^ 2 - u ^ 3 + sin(x)
     lhs = sp.Derivative(x ** 2 * sp.Derivative(f, x), x) + (x**2-1) * (sp.Derivative(f, x) ** 2) - f ** 3 + sp.sin(x) + (f ** 2 * d2)
-    print(f"Equation LHS: {lhs}\n")
+    print(f"Equation LHS: {lhs}")
 
     # 3. Parse
     parser = ElementalEquationParser()

@@ -160,6 +160,8 @@ def _free_coeff_op(d:int, d_out:int, c:sp.Expr, var:sp.Symbol, truncated_order:i
 if __name__ == "__main__":
     from src.utils import local_eq_parser, encoding, boundary_matrix
 
+    ## Testing the build_H_diff function with a sample ODE
+
     n = 2
     d = 2**n - 1
     d_out = 2**(n+1) - 1
