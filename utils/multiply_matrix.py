@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 
 def get_weight(k: int, deg: int) -> float:
     """
@@ -173,6 +174,13 @@ def M_x_power(deg: int, p: int, deg_out: int | None = None) -> np.ndarray:
     # At this point: current_deg = d + p, M has shape (d+1, d+p+1),
     # and we have: x^p * tau_d(x) = M @ tau_{d+p}(x).
 
+    if d_out < current_deg:
+        warnings.warn(
+            f"Truncation in M_x_power: output degree d_out={d_out} "
+            f"is smaller than natural degree d+p={current_deg}. "
+            "Higher Chebyshev modes are truncated.",
+            RuntimeWarning
+        )
     # 2) Convert from tau_{d+p} to tau_{d_out} by rescaling.
     # tau_{d+p,k} = (get_weight(k, d+p) / get_weight(k, d_out)) * tau_{d_out,k}
     max_shared = min(current_deg, d_out)

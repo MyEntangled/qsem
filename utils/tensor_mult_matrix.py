@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 from src.utils import multiply_matrix
 
 def get_weight(k: int, deg: int) -> float:
@@ -35,7 +36,7 @@ def N1_matrix(deg: int, deg_out: int | None = None) -> np.ndarray:
 
     where
         tau_d(x)      = (T_0(x), sqrt(2) T_1(x), ..., sqrt(2) T_d(x))^T / sqrt(d+1),
-        tau_{deg_out} = same encoding up to degree deg_out,
+        tau_{deg_out}(x) = same encoding up with d=deg_out,
 
     and the outer product is flattened in row-major order:
         vec(tau_d ⊗ tau_d)[i*(d+1) + j] = tau_d,i * tau_d,j.
@@ -70,6 +71,16 @@ def N1_matrix(deg: int, deg_out: int | None = None) -> np.ndarray:
         if deg_out < 0:
             raise ValueError("deg_out must be a non-negative integer.")
         d_out = deg_out
+
+    natural_deg_out = 2 * d
+    if d_out < natural_deg_out:
+        warnings.warn(
+            f"Truncation in N1_matrix: output degree d_out={d_out} "
+            f"is smaller than natural degree 2*deg={natural_deg_out}. "
+            "Higher Chebyshev modes in tau_d(x) ⊗ tau_d(x) are truncated.",
+            RuntimeWarning
+        )
+
 
     N1 = np.zeros(((d + 1) * (d + 1), d_out + 1), dtype=float)
 
@@ -145,6 +156,15 @@ def Nx_matrix(deg: int, deg_out: int | None = None) -> np.ndarray:
         if deg_out < 0:
             raise ValueError("deg_out must be a non-negative integer.")
         d_out = deg_out
+
+    natural_deg_out = 2 * d + 1
+    if d_out < natural_deg_out:
+        warnings.warn(
+            f"Truncation in Nx_matrix: output degree d_out={d_out} "
+            f"is smaller than natural degree 2*deg+1={natural_deg_out}. "
+            "Higher Chebyshev modes in x*(tau_d(x) ⊗ tau_d(x)) are truncated.",
+            RuntimeWarning
+        )
 
     # Intermediate degree for the pure self-product
     d_mid = 2 * d
