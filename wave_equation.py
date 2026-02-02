@@ -82,7 +82,11 @@ def solve_wave_equation(deg, c_func, x_z, x_m, y_z, y_m, initial_cond_func=None,
         BtG = Bt @ G
         H += np.kron(BtG.T @ BtG, np.kron(I, I))
 
+    # print("Maximum value in H:", np.max(np.abs(H)))
+    # print("Minimum value in H:", np.min(np.abs(H)))
+    # print("Condition number of H:", np.linalg.cond(H))
     eigvals, eigvecs = np.linalg.eigh(H)
+    # np.save("wave_hamiltonian.npy", H)
     psi_sol = eigvecs[:, 0]
 
     if initial_cond_func is not None:
@@ -124,14 +128,53 @@ def create_animation(x_vals, y_vals, t_vals, wave_solution, name):
     ani.save('{}.gif'.format(name), writer='imagemagick')
     plt.show()
 
+def plot_comparison_slice(x_vals, sem_slice, analytic_slice, time_val, y_val):
+    sem_slice = np.array(sem_slice)
+    analytic_slice = np.array(analytic_slice)
+    abs_error = np.abs(sem_slice - analytic_slice)
+    max_err = np.max(abs_error)
+    mse_err = np.mean(abs_error**2)
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10), dpi=100, sharex=True, gridspec_kw={'height_ratios': [2, 1]})
+    
+    # Plot solutions
+    ax1.plot(x_vals, sem_slice, label="SEM Solution", color='blue', linewidth=2)
+    ax1.plot(x_vals, analytic_slice, label="Analytic Solution", linestyle='--', color='red', linewidth=2)
+    ax1.set_ylabel("Wave Amplitude", fontsize=14)
+    ax1.set_title(f"Wave Solution Slice at y={y_val:.2f}, t={time_val:.2f}", fontsize=16)
+    ax1.legend(fontsize=12, loc='upper right')
+    ax1.grid(True, linestyle='--', alpha=0.7)
+    ax1.tick_params(axis='both', which='major', labelsize=12)
+    
+    # Add text box with error stats
+    textstr = '\n'.join((
+        r'$\mathrm{Max\ Error}=%.2e$' % (max_err, ),
+        r'$\mathrm{MSE}=%.2e$' % (mse_err, )))
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+    ax1.text(0.05, 0.95, textstr, transform=ax1.transAxes, fontsize=12,
+            verticalalignment='top', bbox=props)
+
+    # Plot Error
+    ax2.plot(x_vals, abs_error, label="Absolute Error", color='black', linewidth=1.5)
+    ax2.fill_between(x_vals, abs_error, color='gray', alpha=0.3)
+    ax2.set_xlabel("Position x", fontsize=14)
+    ax2.set_ylabel("Abs. Error", fontsize=14)
+    ax2.grid(True, linestyle='--', alpha=0.7)
+    ax2.tick_params(axis='both', which='major', labelsize=12)
+    ax2.legend(fontsize=12, loc='upper right')
+
+    plt.tight_layout()
+    plt.savefig("Wave_slice_comparison.png", dpi=300)
+    plt.show()
+
 if __name__ == "__main__":
     n = 4
     deg = 2**n - 1
     c = 1.0
     T_end = 3.0
-    N_gridx = 5
-    N_gridy = 5
-    N_gridt = 5
+    N_gridx = 100
+    N_gridy = 100
+    N_gridt = 100
     c_eff = c * T_end / 2.0
     plot = False
     
@@ -168,6 +211,10 @@ if __name__ == "__main__":
                 
     error = np.linalg.norm(wave_solution - true_solution) / np.linalg.norm(true_solution)
     print("Relative L2 Error:", error)
+
+    np.save("wave_solution_sem.npy", wave_solution)
+    np.save("wave_solution_analytic.npy", true_solution)
+
     if plot:
         create_animation(x_vals, y_vals, t_vals_original, wave_solution, "Computed Solution")
         create_animation(x_vals, y_vals, t_vals_original, true_solution, "Analytic Solution")

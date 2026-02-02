@@ -1,6 +1,7 @@
 import numpy as np
 from utils import derivative_matrix, boundary_matrix, encoding, multiply_matrix
 import matplotlib.pyplot as plt
+from euler_bernauli_beam_fem import EulerBernoulliBeamFEM
 
 
 def analytical_deflection(x, q0, EI):
@@ -128,7 +129,8 @@ if __name__ == "__main__":
     I = h * b**3 / 12
     EI = E*I
     uniform_load = -500000
-    grid_points = 20
+    grid_points = deg
+    n_elements = grid_points
     x_z = [-1, 1]
     x_m = [-1, 1]
     
@@ -145,6 +147,22 @@ if __name__ == "__main__":
     true_deflection_fd = analytical_deflection(x_plot_fd, uniform_load, EI)
 
     deflection_fd = euler_beam_fd(EI, L=2, q0=uniform_load, N=grid_points)
+
+    fem = EulerBernoulliBeamFEM(2, n_elements, E, I)
+    fem.assemble_stiffness_matrix()
+    fem.apply_uniform_load(uniform_load)
+    
+    # Boundary Conditions: Clamped at both ends
+    bcs = [
+        (0, 0, 0.0), # Node 0, Disp
+        (0, 1, 0.0), # Node 0, Rot
+        (n_elements, 0, 0.0), # Node n, Disp
+        (n_elements, 1, 0.0)  # Node n, Rot
+    ]
+    
+    fem.apply_boundary_conditions(bcs)
+    
+    deflection_fem = fem.solve()
     
     error = true_deflection - deflection
     print("Chebyshev Spectral Tau Results:")
@@ -162,37 +180,19 @@ if __name__ == "__main__":
     print("L2 Norm of Error: ", np.linalg.norm(error_fd))
     print("Linf Norm of Error: ", np.linalg.norm(error_fd, np.inf))
     print("Relative L2 Error: ", np.linalg.norm(error_fd) / np.linalg.norm(true_deflection))
+    error_fem = true_deflection_fd - deflection_fem[0::2]
+    print("\nFinite Element Results:")
+    print("Max deflection (numerical): ", np.max(np.abs(deflection_fem)))
+    print("Max deflection (analytical): ", np.max(np.abs(true_deflection)))
+    print("Max deflection error: ", np.max(np.abs(error_fem)))
+    print("L2 Norm of Error: ", np.linalg.norm(error_fem))
+    print("Linf Norm of Error: ", np.linalg.norm(error_fem, np.inf))
+    print("Relative L2 Error: ", np.linalg.norm(error_fem) / np.linalg.norm(true_deflection))
 
-    fig, ax = plt.subplots(2, 2, figsize=(8, 10))
-    x_plot = np.linspace(-1, 1, 100)
-    ax[0,0].plot(x_plot, deflection, label='Numerical (Chebyshev)', linestyle='--', color='blue')
-    ax[0,0].plot(x_plot, true_deflection, label='Analytical', linestyle='-', color='red')
-    ax[0,0].set_title('Beam Deflection under Uniform Load')
-    ax[0,0].set_xlabel('Position along Beam (x)')
-    ax[0,0].set_ylabel('Deflection w(x)')
-    ax[0,0].legend()
-    ax[0,0].grid()
-    ax[0,1].plot(x_plot, error, label='Deflection Error', color='green')
-    ax[0,1].set_title('Error in Beam Deflection')
-    ax[0,1].set_xlabel('Position along Beam (x)')
-    ax[0,1].set_ylabel('Error')
-    ax[0,1].legend()
-    ax[0,1].grid()
-
-    ax[1,0].plot(x_plot_fd, deflection_fd, label="Numerical (Finite Difference)", linestyle='--', color='purple')
-    ax[1,0].plot(x_plot_fd, true_deflection_fd, label='Analytical', linestyle='-', color='red')
-    ax[1,0].set_title('Beam Deflection (Finite Difference)')
-    ax[1,0].set_xlabel('Position along Beam (x)')
-    ax[1,0].set_ylabel('Deflection w(x)')
-    ax[1,0].legend()
-    ax[1,0].grid()
-    ax[1,1].plot(x_plot_fd, error_fd, label='Deflection Error (FD)', color='orange')
-    ax[1,1].set_title('Error in Beam Deflection (FD)')
-    ax[1,1].set_xlabel('Position along Beam (x)')
-    ax[1,1].set_ylabel('Error')
-    ax[1,1].legend()
-    ax[1,1].grid()
-    plt.tight_layout()
-    plt.savefig('beam_deflection_with_hamiltonian.png')
-    plt.show()
-    plt.close()
+    np.save("displacement_sem_32deg.npy", deflection)
+    np.save("displacement_fdm_32deg.npy", deflection_fd)
+    np.save("displacement_fem_32deg.npy", deflection_fem)
+    np.save("x_plot", x_plot)
+    np.save("x_plot_fd", x_plot_fd)
+    np.save("x_plot_fem", fem.nodes)
+    np.save("true_deflection_32deg.npy", true_deflection)
