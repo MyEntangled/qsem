@@ -4,15 +4,42 @@ from src.utils import boundary_matrix, derivative_matrix, multiply_matrix, tenso
 import functools
 from typing import Dict, Tuple, Optional, Any, Literal
 
-def build_H_diff(
+def _free_coeff_op(d:int, d_out:int, c:sp.Expr, var:sp.Symbol, truncated_order:int=None):
+    c = sp.sympify(c)
+
+    # Special case: scalar coefficient c = c0
+    if c.is_Number:
+        M_1 = multiply_matrix.M_x_power(deg=d, p=0, deg_out=d_out)
+        return float(c) * M_1
+
+    if not c.is_polynomial(var):
+        ## If not polynomial, return truncated Maclaurin series
+        if truncated_order is None:
+            raise ValueError("truncated_order must be specified for non-polynomial coefficients.")
+        coeff = sp.series(c, x=var, x0=0, n=truncated_order).removeO()
+    else:
+        coeff = c
+
+    ## Coeff is a polynomial (c0 + c1 * x + c2 * x**2 + ...)
+    ## Construct the corresponding H = c0 * M_1 + c1 * M_x + c2 * M_x2 + ...
+    c_terms = coeff.as_ordered_terms()
+    A = 0
+    for term in c_terms:
+        power = sp.degree(term, gen=var)
+        scalar = term.coeff(var, power)
+        M_xp = multiply_matrix.M_x_power(deg=d, p=power, deg_out=d_out)
+        A += scalar * M_xp
+    return A
+
+def build_differential_op(
         d: int,
         d_out: int,
         terms_dict: Dict[Tuple[int, int, int], Any],
         var: Any,
         truncated_order: Optional[int] = None,
-        regular_constraint_val: float = 1.0,
-        regular_constraint_pos: float = 0.0,
-        regular_constraint_type: Literal['value', 'derivative'] = 'value'
+        regular_constraint_val: float = None,
+        regular_constraint_pos: float = None,
+        regular_constraint_type: Literal['value', 'derivative'] = None
 ) -> np.ndarray:
     """
     Constructs the effective Hamiltonian for a NDE.
@@ -26,8 +53,8 @@ def build_H_diff(
         terms_dict (dict): Mapping (n, m, k) -> coefficient function c(x).
         var (Any): Symbolic variable.
         truncated_order (int, optional): Truncation order for coefficients.
-        regular_constraint_val (float): Target value for regularization (y_s).
         regular_constraint_pos (float): Position x_s for regularization.
+        regular_constraint_val (float): Target value for regularization (y_s).
         regular_constraint_type (str): 'value' (f) or 'derivative' (f').
 
     Returns:
@@ -45,23 +72,27 @@ def build_H_diff(
     GT = derivative_matrix.chebyshev_diff_matrix(deg=d)
     Id = np.eye(d + 1)
 
-    # 3. Regular Constraint Operator (Padding)
-    # [cite_start]Ref: Eq (30) [cite: 533] [cite_start]and Eq (32) [cite: 575]
-    B_mat = boundary_matrix.regular_value_boundary_matrix(deg=d, x_s=regular_constraint_pos, y_s=1.0)
+    # 3. Regular Constraint Operator to replace scalar value of 1
 
     if regular_constraint_type == 'value':
+        # Ref: Eq (11)
         if abs(regular_constraint_val) < 1e-12:
             raise ValueError("Regular constraint value f(x_s) cannot be zero.")
-        D_reg = B_mat / regular_constraint_val
+        D_reg = boundary_matrix.regular_value_boundary_matrix(deg=d,
+                                                              x_s=regular_constraint_pos,
+                                                              y_s=regular_constraint_val)
 
     elif regular_constraint_type == 'derivative':
-        # [cite_start]Ref: Eq (12) [cite: 172]
+        # Ref: Eq (12)
         if abs(regular_constraint_val) < 1e-12:
             raise ValueError("Regular constraint derivative f'(x_s) cannot be zero.")
-        D_reg = (B_mat @ GT) / regular_constraint_val
+        D_reg = boundary_matrix.regular_derivative_boundary_matrix(deg=d,
+                                                                  x_s=regular_constraint_pos,
+                                                                  t_s=regular_constraint_val)
 
     else:
-        raise ValueError("regular_constraint_type must be 'value' or 'derivative'")
+        pass
+        #raise ValueError("regular_constraint_type must be 'value' or 'derivative'")
 
     A = 0.0
 
@@ -123,38 +154,49 @@ def build_H_diff(
 
         A += coeff_op @ reduced_op
 
-    # 5. Form Effective Hamiltonian
-    H = A.T @ A
+    # # 5. Form Effective Hamiltonian
+    # H = A.T @ A
 
-    return H.astype(float)
+    return A.astype(float)
 
+def differential_hamiltonian(num_variables, diff_op_list):
+    """
+    Assembles the total differential Hamiltonian for multiple variables.
+    ASSUMPTION: Each operator in diff_op_list corresponds to a single variable. The differential equation should have no mixed-variable term
 
-def _free_coeff_op(d:int, d_out:int, c:sp.Expr, var:sp.Symbol, truncated_order:int=None):
-    c = sp.sympify(c)
+    Args:
+        num_variables (int): Number of variables in the system.
+        diff_op_list (list): List of differential operators for each variable.
+    Returns:
+        np.ndarray: The total differential Hamiltonian.
+    """
+    if not diff_op_list or len(diff_op_list) != num_variables:
+        raise ValueError("The length of diff_op_list must match num_variables.")
 
-    # Special case: scalar coefficient c = c0
-    if c.is_Number:
-        M_1 = multiply_matrix.M_x_power(deg=d, p=0, deg_out=d_out)
-        return float(c) * M_1
+    ## A = (A1 ⊗ I ⊗ ... ) + (I ⊗ A_2 ⊗ I ...) + ...
+    ## The size of A_i's matrices can be different.
+    ## Then, H = A^T @ A
 
-    if not c.is_polynomial(var):
-        ## If not polynomial, return truncated Maclaurin series
-        if truncated_order is None:
-            raise ValueError("truncated_order must be specified for non-polynomial coefficients.")
-        coeff = sp.series(c, x=var, x0=0, n=truncated_order).removeO()
-    else:
-        coeff = c
-
-    ## Coeff is a polynomial (c0 + c1 * x + c2 * x**2 + ...)
-    ## Construct the corresponding H = c0 * M_1 + c1 * M_x + c2 * M_x2 + ...
-    c_terms = coeff.as_ordered_terms()
     A = 0
-    for term in c_terms:
-        power = sp.degree(term, gen=var)
-        scalar = term.coeff(var, power)
-        M_xp = multiply_matrix.M_x_power(deg=d, p=power, deg_out=d_out)
-        A += scalar * M_xp
-    return A
+    for i in range(num_variables):
+        Ai = diff_op_list[i]
+        # Build the Kronecker product structure
+        ops_list = []
+        for j in range(num_variables):
+            if j == i:
+                ops_list.append(Ai)
+            else:
+                Id_j = np.eye(diff_op_list[j].shape[1])
+                ops_list.append(Id_j)
+        A += functools.reduce(np.kron, ops_list)
+    return A.T @ A
+
+
+def sem_differential_hamiltonian():
+    """
+    Placeholder for SEM differential Hamiltonian assembly.
+    """
+    pass
 
 
 if __name__ == "__main__":
@@ -162,77 +204,81 @@ if __name__ == "__main__":
 
     ## Testing the build_H_diff function with a sample ODE
 
-    n = 2
+    n = 3
     d = 2**n - 1
     d_out = 2**(n+1) - 1
-    print(f"Using Chebyshev degree d={d}, output degree d_out={d_out}\n")
-
+    print(f"Using Chebyshev degree d={d}, output degree d_out={d_out}")
     x = sp.Symbol('x')
     f = sp.Function('f')(x)
+
 
     d1 = f.diff(x)
     d2 = f.diff(x, 2)
 
-    # l,m = 5,1
+    #l,m = 5,1
     #lhs = (1 - x**2)**2 * d2 - 2*x*(1-x**2)*d1 + (l*(l+1)*(1-x**2) - m**2)*f
     #lhs = (1 - x**2) * d2 - 2*x*d1 + (l*(l+1) - m**2/(1-x**2))*f
-    #lhs = (x-1) * d2 - x * d1 + f - (x-1)**2
-    lhs = d2 - 2*f**2 + x
+    lhs = (x-1) * d2 - x * d1 + f - (x-1)**2
+    print(f"Equation LHS: {lhs}")
+
 
     # Analytical solution
     from scipy.special import lpmv
-    #x_s = 0.5
+    x_s = 0.5
     #sol = lambda x: lpmv(m,l,x)
-    #sol = lambda x: 1.5 * np.exp(x) - 0.125*x*(8*x+13) - 1
-    #data_s = (x_s, sol(x_s))
-    data_s = (-1, -0.1)
+    sol = lambda x: 1.5 * np.exp(x) - 0.125*x*(8*x+13) - 1
+    data_s = (x_s, sol(x_s))
+    print("Regular data point:", data_s)
 
-    print(f"Equation LHS: {lhs}\n")
 
     parser = local_eq_parser.ElementalEquationParser()
     terms = parser.parse_equation(lhs, f, x)
-    print("Parsed Terms:\n")
-    print(terms)
+    print("Parsed Terms:", terms)
 
     local_terms = parser.transform(a=-1, b=1)
-    print("\nTransformed Terms (Reference Domain) with variable xi:", local_terms)
+    print("Transformed Terms (Reference Domain) with variable xi:", local_terms)
 
-    H = build_H_diff(d, d_out, terms,
-                           var=parser.x_sym,
-                           truncated_order=None,
-                           regular_constraint_val=0.1,
-                           regular_constraint_pos=1,
-                           regular_constraint_type='value')
-    #H_diff_xi = diff_hamiltonian.build_H_diff(d, d_out, local_terms, var=parser.xi_sym, truncated_order=300)
-    #assert np.allclose(H_diff_xi, H_diff)
+    A = build_differential_op(d, d_out, terms,
+                              var=parser.x_sym,
+                              truncated_order=None,
+                              regular_constraint_pos=data_s[0],
+                              regular_constraint_val=data_s[1],
+                              regular_constraint_type='value')
+    # A_xi = build_differential_op(d, d_out, local_terms,
+    #                           var=parser.xi_sym,
+    #                           truncated_order=None,
+    #                           regular_constraint_pos=data_s[0],
+    #                           regular_constraint_val=data_s[1],
+    #                           regular_constraint_type='value')
+
+    #H_diff = assemble_differential_hamiltonian(1, [A])
+    #H_diff_xi = assemble_differential_hamiltonian(1, [A_xi])
+
+    #assert np.allclose(H_diff_xi, H_diff), "Transformed operator does not match original!"
 
 
-    x_z = 0.02615
-    B_z = boundary_matrix.zero_value_boundary_matrix(deg=d, x_z=x_z)
-    N1 = tensor_mult_matrix.N1_matrix(deg=d, deg_out=d_out)
 
 
-    # B_s = boundary_matrix.zero_value_boundary_matrix(deg=d, x_z=1)
-    # D_s = B_s / 0.1
-    # B = N1 @ np.kron(D_s, B_z)
-    # H += B.T @ B
+    H = A.T @ A
 
-    B_s = boundary_matrix.zero_value_boundary_matrix(deg=d, x_z=-1)
-    D_s = B_s / (-0.1)
-    B = N1 @ np.kron(D_s, B_z)
-    H += 1 * B.T @ B
+    x_m = -0.195976
+    B_m = boundary_matrix.zero_value_boundary_matrix(deg=d_out, x_z=x_m)
+    M1 = multiply_matrix.M_x_power(d, p=0, deg_out=d_out)
+    GT = derivative_matrix.chebyshev_diff_matrix(deg=d)
+
+    B = B_m @ M1 @ GT
+    H +=1 * B.T @ B
 
 
     eigvals, eigvecs = np.linalg.eigh(H)
     psi_sol = eigvecs[:, 0]
+    print("Ground energy", eigvals[0])
     print("Spectral gap:", eigvals[1] - eigvals[0])
-    print("Solution coefficients (Chebyshev basis):")
-    print(psi_sol)
+    print("Solution coefficients (Chebyshev basis):", np.round(psi_sol,2))
 
-    #f_s = np.dot(encoding.chebyshev_encoding(deg=d, x=data_s[0]), psi_sol)
-    f_s = np.dot(encoding.chebyshev_encoding(deg=d_out, x=data_s[0]), N1 @ np.kron(D_s, np.eye(d+1)) @ psi_sol)
+    f_s = np.dot(encoding.chebyshev_encoding(deg=d_out, x=data_s[0]), M1 @ psi_sol)
     s_eta = data_s[1] / f_s
-    print(s_eta**2)
+    print("Scaling^2:", s_eta**2)
 
 
     # Plot the solution
@@ -244,15 +290,62 @@ if __name__ == "__main__":
 
     for xj in x_plot:
         tau = encoding.chebyshev_encoding(deg=d_out, x=xj)
-
-        #B_j = boundary_matrix.zero_value_boundary_matrix(deg=d, x_z=xj)
-        fQ_plot.append(s_eta * np.dot(tau, N1 @ np.kron(D_s, np.eye(d+1)) @ psi_sol))
-        #f_plot.append(sol(xj))
+        fQ_plot.append(s_eta * np.dot(tau, M1 @ psi_sol))
+        f_plot.append(sol(xj))
     plt.plot(x_plot, fQ_plot, c='red', label=r'$f^*_{Q}(x)$')
-    #plt.plot(x_plot, f_plot, '--', label=rf'$P^{m}_{l}(x)$')
+    plt.plot(x_plot, f_plot, '--', label=r'f^*(x)')
     plt.title(f"Solution to ODE: n={n}")
     plt.xlabel("x")
     plt.ylabel("f(x)")
     plt.legend()
     plt.grid()
     plt.show()
+
+
+
+    # ## For Eq (34)
+    #lhs = d2 - 2*f**2 + x
+
+    # x_z = 0.02615
+    # B_z = boundary_matrix.zero_value_boundary_matrix(deg=d, x_z=x_z)
+    # N1 = tensor_mult_matrix.N1_matrix(deg=d, deg_out=d_out)
+    #
+    # B_s = boundary_matrix.zero_value_boundary_matrix(deg=d, x_z=1)
+    # D_s = B_s / 0.1
+    # B = N1 @ np.kron(D_s, B_z)
+    # H += B.T @ B
+    #
+    # B_s = boundary_matrix.zero_value_boundary_matrix(deg=d, x_z=-1)
+    # D_s = B_s / (-0.1)
+    # B = N1 @ np.kron(D_s, B_z)
+    # H += 1 * B.T @ B
+
+    # eigvals, eigvecs = np.linalg.eigh(H)
+    # psi_sol = eigvecs[:, 0]
+    # print("Spectral gap:", eigvals[1] - eigvals[0])
+    # print("Solution coefficients (Chebyshev basis):", psi_sol)
+    #
+    # f_s = np.dot(encoding.chebyshev_encoding(deg=d_out, x=data_s[0]), N1 @ np.kron(D_s, np.eye(d+1)) @ psi_sol)
+    # s_eta = data_s[1] / f_s
+    # print(s_eta**2)
+    #
+    #
+    # # Plot the solution
+    # import matplotlib.pyplot as plt
+    # x_plot = np.linspace(-1, 1, 10000)
+    # #x_plot = encoding.chebyshev_nodes(deg=deg)
+    # fQ_plot = []
+    # f_plot = []
+    #
+    # for xj in x_plot:
+    #     tau = encoding.chebyshev_encoding(deg=d_out, x=xj)
+    #     fQ_plot.append(s_eta * np.dot(tau, N1 @ np.kron(D_s, np.eye(d+1)) @ psi_sol))
+    #     f_plot.append(sol(xj))
+    # plt.plot(x_plot, fQ_plot, c='red', label=r'$f^*_{Q}(x)$')
+    # #plt.plot(x_plot, f_plot, '--', label=rf'$P^{m}_{l}(x)$')
+    # plt.title(f"Solution to ODE: n={n}")
+    # plt.xlabel("x")
+    # plt.ylabel("f(x)")
+    # plt.legend()
+    # plt.grid()
+    # plt.show()
