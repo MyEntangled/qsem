@@ -9,36 +9,37 @@ def solve_KPP_fisher(deg, deg_out, coeffs, regBC, xzs):
     xz1, xz2 = xzs
     N1 = tensor_mult_matrix.N1_matrix(deg,deg_out)
     GT = derivative_matrix.chebyshev_diff_matrix(deg)
-    Bx = boundary_matrix.zero_value_boundary_matrix(deg,xs)
-    Bt = boundary_matrix.zero_value_boundary_matrix(deg,-1)
+    Dx = boundary_matrix.zero_value_boundary_matrix(deg,xs) / np.sqrt(ys)
+    Dt = boundary_matrix.zero_value_boundary_matrix(deg,-1) / np.sqrt(ys)
     In = np.eye(deg+1)
 
     Bc1 = boundary_matrix.zero_value_boundary_matrix(deg,xz1)
     Bc2 = boundary_matrix.zero_value_boundary_matrix(deg,xz2)
 
-    term1 = reduce(np.kron, [Bx,In,Bt,GT])/ys
-    term2 = reduce(np.kron, [Bx,GT@GT,Bt,In])*D/ys
-    term3 = reduce(np.kron, [Bx,In,Bt,In])/ys
+    term1 = reduce(np.kron, [Dx,In,Dt,GT])
+    term2 = reduce(np.kron, [Dx,GT@GT,Dt,In])
+    term3 = reduce(np.kron, [Dx,In,Dt,In])
     term4 = reduce(np.kron, [In,In,In,In])
-    A = np.kron(N1,N1) @ (term1 - term2 - r*(term3-term4))
-    B1 = np.kron(N1,N1) @ (reduce(np.kron, [Bx,Bc1,Bt,In])/ys)
-    B2 = np.kron(N1,N1) @ (reduce(np.kron, [Bx,Bc2,Bt,In])/ys)
+    A = np.kron(N1,N1) @ (term1 - D*term2 - r*(term3-term4))
+    B1 = np.kron(N1,N1) @ (reduce(np.kron, [Dx,Bc1,Dt,In]))
+    B2 = np.kron(N1,N1) @ (reduce(np.kron, [Dx,Bc2,Dt,In]))
 
     H = A.T@A + B1.T@B1 + B2.T@B2
+    print(H.shape)
 
     eigvals, eigvecs = np.linalg.eigh(H)
-    psi_sol = eigvecs[:, 0]
+    psi_sol = eigvecs[:,0]
     print("Spectral gap:", eigvals[1] - eigvals[0])
     return psi_sol
 
 def evaluate_KPP_fisher(deg, deg_out, regBC, psi_sol, x, t):
     xs, ys = regBC
     N1 = tensor_mult_matrix.N1_matrix(deg,deg_out)
-    Bx = boundary_matrix.zero_value_boundary_matrix(deg,xs)
-    Bt = boundary_matrix.zero_value_boundary_matrix(deg,-1)
+    Dx = boundary_matrix.zero_value_boundary_matrix(deg,xs) / np.sqrt(ys)
+    Dt = boundary_matrix.zero_value_boundary_matrix(deg,-1) / np.sqrt(ys)
     In = np.eye(deg+1)
 
-    A = np.kron(N1,N1) @ (reduce(np.kron, [Bx,In,Bt,In])/ys)
+    A = np.kron(N1,N1) @ (reduce(np.kron, [Dx,In,Dt,In]))
     tau_x = encoding.chebyshev_encoding(deg=deg_out, x=x)
     tau_t = encoding.chebyshev_encoding(deg=deg_out, x=t)
     tau = np.kron(tau_x,tau_t)
@@ -47,7 +48,7 @@ def evaluate_KPP_fisher(deg, deg_out, regBC, psi_sol, x, t):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    n = 3
+    n = 2
     deg = 2**n - 1
     deg_out = 2**(n+1) - 1
     coeffs = (-1, 1)

@@ -14,6 +14,7 @@ def solve_ODE(deg, a,b,c,x_z):
 
     H = T_A + T_B
     eigvals, eigvecs = np.linalg.eigh(H)
+    print(np.linalg.cond(H))
     psi_sol = eigvecs[:, 0]
     print("Ground State Energy:", eigvals[0])
     print("Spectral gap:", eigvals[1] - eigvals[0])
@@ -21,7 +22,7 @@ def solve_ODE(deg, a,b,c,x_z):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    deg = 7
+    deg = 31
     a = 1.0
     b = 4.0
     c = 4.0
