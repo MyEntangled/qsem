@@ -1,8 +1,8 @@
 import numpy as np
 
-import boundary_matrix, derivative_matrix
+from src.utils import boundary_matrix, derivative_matrix
 
-def boundary_continuity_matrice_1D(type: int, M: int, deg: int, deg_out: int = None):
+def boundary_continuity_matrice_1D(type: str, M: int, deg: int, deg_out: int = None):
     """Assemble the 1D continuity penalty matrix across element interfaces.
 
     This function constructs a global block matrix enforcing continuity conditions
@@ -43,15 +43,21 @@ def boundary_continuity_matrice_1D(type: int, M: int, deg: int, deg_out: int = N
     B_left = boundary_matrix.build_boundary_matrix(type, deg, x=-1, deg_out=deg_out)
     B_right = boundary_matrix.build_boundary_matrix(type, deg, x=1, deg_out=deg_out)
 
+    B_ll = B_left.T @ B_left
+    B_rr = B_right.T @ B_right
+    B_lr = B_left.T @ B_right
+    B_rl = B_right.T @ B_left
+
     C = np.zeros(((deg+1)*M, (deg+1)*M))
+
     for i in range(M):
         for j in range(M):
             if i == j - 1:
-                C_ij = -B_right.T @ B_left
+                C_ij = - B_rl
             elif i == j:
-                C_ij = B_right.T @ B_right * (i <= M-2) + B_left.T @ B_left * (i >= 1)
+                C_ij = B_rr * (i <= M-2) + B_ll * (i >= 1)
             elif i == j + 1:
-                C_ij = -B_left.T @ B_right
+                C_ij = - B_lr
             else:
                 C_ij = np.zeros((deg+1, deg+1))
             C[i*(deg+1) : (i+1)*(deg+1), j*(deg+1) : (j+1)*(deg+1)] = C_ij
