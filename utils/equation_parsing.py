@@ -3,10 +3,6 @@ import sympy as sp
 
 class ElementalEquationParser:
     def __init__(self):
-        #self.terms_dict = {}
-        #self.f_sym = None
-        #self.x_sym = None
-        #self.xi_sym = sp.Symbol('xi')  # Reference domain variable
         return
 
     def parse_equation(self, diff_eq, func_sym):
@@ -91,14 +87,6 @@ class ElementalEquationParser:
         else:
             terms_dict[(n,m,k)] = coeff
         return terms_dict
-
-
-    # def _add_coeff(self, key, val, terms_dict):
-    #     if key in terms_dict:
-    #         terms_dict[key] += val
-    #     else:
-    #         terms_dict[key] = val
-    #     return terms_dict
 
     def transform(self, terms_dict, var_sym, a:float, b:float):
         """
