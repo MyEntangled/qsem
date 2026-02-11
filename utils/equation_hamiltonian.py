@@ -210,6 +210,9 @@ def sem_equation_hamiltonian(d: int,
     lo = endpoints[:, 0]
     hi = endpoints[:, 1]
 
+    N = d + 1
+    N_out = d_out + 1
+
     parser = equation_parsing.ElementalEquationParser()
     terms = parser.parse_equation(diff_eq, func)
     ## Check if tensor rank = 1, otherwise raise NotImplementedError (need to handle padding and regularization for higher tensor ranks)
@@ -220,6 +223,7 @@ def sem_equation_hamiltonian(d: int,
     ## Find which element x_s belongs to and the corresponding local variable for regularization
     e_s = None
     xi_s_in_e_s = None
+
     if regular_data is not None:
         (x_s, y_s) = regular_data
         for e in range(num_elements):
@@ -232,9 +236,10 @@ def sem_equation_hamiltonian(d: int,
     else:
         x_s, y_s = None, None
 
-    print("(e_s, xi_s, y_s):", e_s, xi_s_in_e_s, y_s)
+    #print("(x_s, e_s, xi_s, y_s):", x_s, e_s, xi_s_in_e_s, y_s)
 
-    H_total = np.zeros(((d+1)*num_elements, (d+1)*num_elements))
+    H_total = np.zeros((N * num_elements, N * num_elements))
+    A_total = np.zeros((N_out * num_elements, N * num_elements))
 
     for e in range(num_elements):
         local_var_terms, local_var = parser.transform(terms_dict=terms, var_sym=var, a=lo[e], b=hi[e])
@@ -260,12 +265,15 @@ def sem_equation_hamiltonian(d: int,
                                                 regular_data_type=regular_data_type)
 
         ## A_e = |e><e| \otimes A_hom + |e><e_s| \otimes A_inhom
-        A_e = np.zeros(((d_out+1)*num_elements, (d+1)*num_elements))
-        A_e[e*(d_out+1):(e+1)*(d_out+1), e*(d+1):(e+1)*(d+1)] = A_hom
-        if inhom_terms is not None:
-            A_e[e*(d_out+1):(e+1)*(d_out+1), e_s*(d+1):(e_s+1)*(d+1)] = A_inhom
+        A_e = np.zeros((N_out * num_elements, N * num_elements))
+        A_e[e*N_out : (e+1)*N_out, e*N : (e+1)*N] += A_hom
 
-        H_total += build_equation_hamiltonian(A_e)
+        if inhom_terms is not None:
+            A_e[e*N_out : (e+1)*N_out, e_s*N:(e_s+1)*N] += A_inhom
+
+        A_total += A_e
+
+    H_total = build_equation_hamiltonian(A_total)
 
     return H_total
 

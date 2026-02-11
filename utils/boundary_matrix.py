@@ -274,6 +274,7 @@ def sem_boundary_hamiltonian(deg: int, deg_out: int, endpoints: np.ndarray, type
 
     B = build_boundary_matrix(type=type, deg=deg, x=xi_s_in_e_s, deg_out=deg_out)
     B_total = np.zeros(((deg_out + 1)*num_elements, (deg + 1)*num_elements))
+
     B_total[e_s*(deg_out+1):(e_s+1)*(deg_out+1), e_s*(deg+1):(e_s+1)*(deg+1)] = B
 
     return B_total.T @ B_total
