@@ -234,51 +234,6 @@ def build_boundary_matrix(type: str, deg: int, x: float, y: float = None, deg_ou
         raise ValueError("type must be either 'value' or 'derivative'.")
     return B
 
-def sem_boundary_hamiltonian(deg: int, deg_out: int, endpoints: np.ndarray, type: str, x: float):
-    """Construct the boundary Hamiltonian for a single boundary constraint.
-
-    The boundary Hamiltonian is defined as B^T B, where B is the boundary matrix corresponding
-    to the specified constraint. This can be used in the semigroup formulation to enforce the
-    boundary condition.
-
-    Parameters
-    ----------
-    deg:
-        Input Chebyshev degree d.
-    deg_out:
-        Output Chebyshev degree for lifting the operator.
-    type:
-        Either `'value'` or `'derivative'`.
-    x:
-        Point where the boundary constraint is imposed.
-
-    Returns
-    -------
-    numpy.ndarray
-        The boundary Hamiltonian matrix B^T B.
-    """
-    assert endpoints.ndim == 2
-    num_elements = endpoints.shape[0]
-    lo = endpoints[:, 0]
-    hi = endpoints[:, 1]
-
-    # Check that x is within the domain
-    e_s = None
-    for e in range(num_elements):
-        if lo[e] <= x <= hi[e]:
-            e_s = e
-            xi_s_in_e_s = (2 * x - (lo[e] + hi[e])) / (hi[e] - lo[e])  # Map to [-1, 1]
-            break
-    if e_s is None:
-        raise ValueError(f"Regularization point x={x} is not found in the mesh.")
-
-    B = build_boundary_matrix(type=type, deg=deg, x=xi_s_in_e_s, deg_out=deg_out)
-    B_total = np.zeros(((deg_out + 1)*num_elements, (deg + 1)*num_elements))
-
-    B_total[e_s*(deg_out+1):(e_s+1)*(deg_out+1), e_s*(deg+1):(e_s+1)*(deg+1)] = B
-
-    return B_total.T @ B_total
-
 
 if __name__ == '__main__':
     d_in = 33

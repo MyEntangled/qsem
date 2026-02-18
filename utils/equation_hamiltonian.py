@@ -1,7 +1,8 @@
 import sympy as sp
 import numpy as np
 import scipy
-from src.utils import boundary_matrix, derivative_matrix, multiply_matrix, tensor_mult_matrix, equation_parsing, function_evaluation, interface_continuity
+from src.utils import boundary_matrix, derivative_matrix, multiply_matrix, tensor_mult_matrix, equation_parsing, \
+    function_evaluation, interface_continuity, sem_boundary_matrix
 import functools
 import warnings
 from typing import Dict, Tuple, Optional, Any, Literal
@@ -107,14 +108,6 @@ def build_equation_operator(
             if regular_data_type == 'value':
                 raise ValueError("Regular value y_s should be non-zero.")
 
-        # if regular_data_type == 'value':
-        #     # Ref: Eq (11)
-        #     D_reg = boundary_matrix.regular_value_boundary_matrix(deg=d, x_s=regular_x, y_s=regular_y)
-        # else:  # regular_constraint_type == 'derivative'
-        #     # Ref: Eq (12)
-        #     D_reg = boundary_matrix.regular_derivative_boundary_matrix(deg=d, x_s=regular_x, t_s=regular_y
-        #     )
-
         D_reg = boundary_matrix.build_boundary_matrix(type=regular_data_type, deg=d, x=regular_x, y=regular_y)
 
     A = 0.0
@@ -181,14 +174,10 @@ def build_equation_operator(
 
         A += coeff_op @ reduced_op
 
-    # # 5. Form Effective Hamiltonian
-    # H = A.T @ A
-
     return A.astype(float)
 
 
-def build_equation_hamiltonian(equation_op):
-    A = equation_op
+def get_hamiltonian_from_operator(A):
     return A.T @ A
 
 
@@ -238,7 +227,6 @@ def sem_equation_hamiltonian(d: int,
 
     #print("(x_s, e_s, xi_s, y_s):", x_s, e_s, xi_s_in_e_s, y_s)
 
-    H_total = np.zeros((N * num_elements, N * num_elements))
     A_total = np.zeros((N_out * num_elements, N * num_elements))
 
     for e in range(num_elements):
@@ -273,7 +261,7 @@ def sem_equation_hamiltonian(d: int,
 
         A_total += A_e
 
-    H_total = build_equation_hamiltonian(A_total)
+    H_total = get_hamiltonian_from_operator(A_total)
 
     return H_total
 
@@ -348,12 +336,12 @@ if __name__ == "__main__":
     # H += B.T @ B
 
     x_m = 0.0  # -0.195976
-    B_sem = boundary_matrix.sem_boundary_hamiltonian(type='derivative', deg=d, deg_out=d_out, endpoints=endpoints, x=x_m)
+    B_sem = sem_boundary_matrix.sem_boundary_hamiltonian(type='derivative', deg=d, deg_out=d_out, endpoints=endpoints, x=x_m)
     H_sem += B_sem
 
     num_elements = endpoints.shape[0]
-    H_sem += 100000 * interface_continuity.boundary_continuity_matrice_1D('value', num_elements, d)
-    H_sem += 100000 * interface_continuity.boundary_continuity_matrice_1D('derivative', num_elements, d)
+    H_sem += 100000 * interface_continuity.boundary_continuity_matrice('value', num_elements, d)
+    H_sem += 100000 * interface_continuity.boundary_continuity_matrice('derivative', num_elements, d)
 
 
     eigvals, eigvecs = np.linalg.eigh(H_sem)
