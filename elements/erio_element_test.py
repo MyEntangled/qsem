@@ -1,6 +1,7 @@
-from src.utils import boundary_matrix, function_evaluation, equation_hamiltonian, interface_continuity, regularization, \
-    meshing, sem_boundary_matrix
-from src.utils import multivar_equation_parsing, multivar_equation_hamiltonian
+from src.utils import function_evaluation, interface_continuity, regularization, \
+    meshing
+from src.utils.boundary_hamiltonian.general_boundary_hamiltonian import build_general_boundary_matrix
+from src.utils.diffeq_hamiltonian import multivar_equation_hamiltonian, equation_hamiltonian
 import numpy as np
 import sympy as sp
 
@@ -37,8 +38,10 @@ def test_ode_variable_coeff(n: int, num_elements: int):
 
     H_diff_sem = equation_hamiltonian.sem_equation_hamiltonian(d, d_out, lhs, f, x, endpoints=endpoints, regular_data=None, regular_data_type='value')
 
-    x_m = 0 #-0.195976
-    HB_sem = sem_boundary_matrix.sem_boundary_hamiltonian(type='derivative', deg=d, deg_out=d_out, endpoints=endpoints, x=x_m)
+    x_m = 0. #-0.195976
+    # HB_sem = sem_boundary_matrix.sem_boundary_hamiltonian(type='derivative', x=x_m, deg=d, deg_out=d_out,
+    #                                                       endpoints=endpoints)
+    HB_sem = build_general_boundary_matrix(type='derivative', coords=x_m, deg=d, deg_out=d_out, endpoints=endpoints)
 
     HC0_sem = interface_continuity.boundary_continuity_matrice('value', num_elements, d)
     HC1_sem = interface_continuity.boundary_continuity_matrice('derivative', num_elements, d)
@@ -108,7 +111,9 @@ def test_inhom_ode(n: int, num_elements: int):
     H_diff_sem = equation_hamiltonian.sem_equation_hamiltonian(d, d_out, lhs, f, x, endpoints=endpoints, regular_data=data_s, regular_data_type='value')
 
     x_m = -0.195976
-    HB_sem = sem_boundary_matrix.sem_boundary_hamiltonian(type='derivative', deg=d, deg_out=d_out, endpoints=endpoints, x=x_m)
+    # HB_sem = sem_boundary_matrix.sem_boundary_hamiltonian(type='derivative', x=x_m, deg=d, deg_out=d_out,
+    #                                                       endpoints=endpoints)
+    HB_sem = build_general_boundary_matrix(type='derivative', coords=x_m, deg=d, deg_out=d_out, endpoints=endpoints)
 
     HC0_sem = interface_continuity.boundary_continuity_matrice('value', num_elements, d)
     HC1_sem = interface_continuity.boundary_continuity_matrice('derivative', num_elements, d)
@@ -154,7 +159,13 @@ def test_inhom_ode(n: int, num_elements: int):
 
 def test_wave_equation(n: int, num_elements_for_dims: np.ndarray):
     d = 2 ** n - 1
-    d_out = 2 ** n - 1
+    d_out = 2 ** (n+1) - 1
+
+    ## General setting
+    Lx, Ly, T = 1.0, 1.0, 1.0
+    mx, my = 2,3
+    omega = np.pi * np.sqrt((mx / Lx) ** 2 + (my / Ly) ** 2)
+    lmbda = (mx * np.pi / Lx) ** 2 + (my * np.pi / Ly) ** 2
 
     x, y, t = sp.symbols('x y t')
     f = sp.Function('f')(x, y, t)
@@ -165,16 +176,14 @@ def test_wave_equation(n: int, num_elements_for_dims: np.ndarray):
 
     c = 1.0
     lhs = d2t - c**2 * (d2x + d2y)
+    lhs = lhs + c**2 * lmbda * sp.sin(mx * np.pi * x / Lx) * sp.sin(my * np.pi * y / Ly)
     print(f"Equation LHS: {lhs}")
 
 
-    ## General setting
-    Lx, Ly, T = 1.0, 1.0, 1.0
-    mx, my = 2,3
-    omega = np.pi * np.sqrt((mx / Lx) ** 2 + (my / Ly) ** 2)
-    sol = lambda x, y, t: float(np.sin(mx * np.pi * x / Lx) * np.sin(my * np.pi * y / Ly) * np.cos(omega * t))
+    #sol = lambda x, y, t: float(np.sin(mx * np.pi * x / Lx) * np.sin(my * np.pi * y / Ly) * np.cos(omega * t))
+    sol = lambda x,y,t: float(np.sin(mx * np.pi * x / Lx) * np.sin(my * np.pi * y / Ly) * np.cos(omega * t) - np.sin(mx * np.pi * x / Lx) * np.sin(my * np.pi * y / Ly))
 
-    coord_s = (0.25, 0.25, 0.5)
+    coord_s = (Lx/(2*mx), Ly/(2*my), np.pi/omega)
     data_s = (coord_s, sol(*coord_s))
     print("Regular data point:", data_s)
 
@@ -197,18 +206,20 @@ def test_wave_equation(n: int, num_elements_for_dims: np.ndarray):
                                                                                  vars=(x, y, t),
                                                                                  endpoints=endpoints,
                                                                                  regular_data=data_s,
-                                                                                 regular_data_type='value')
+                                                                                 regular_data_type='value',
+                                                                                 truncated_order=8)
     print("Hamiltonian size:", H_diff_sem.shape)
 
     # Boundary conditions (Dirichlet)
     # f(0,y,t) = f(Lx,y,t) = f(x,0,t) = f(x,Ly,t) = 0 for all t
     # Optional: f(x,y,0) = 0 for all x,y
 
-    HB_sem = sem_boundary_matrix.sem_multivar_boundary_hamiltonian(deg=d, deg_out=d_out, endpoints=endpoints, type='value', coords=(0, None, None)) + \
-             sem_boundary_matrix.sem_multivar_boundary_hamiltonian(deg=d, deg_out=d_out, endpoints=endpoints, type='value', coords=(Lx, None, None)) + \
-             sem_boundary_matrix.sem_multivar_boundary_hamiltonian(deg=d, deg_out=d_out, endpoints=endpoints, type='value', coords=(None, 0, None)) + \
-             sem_boundary_matrix.sem_multivar_boundary_hamiltonian(deg=d, deg_out=d_out, endpoints=endpoints, type='value', coords=(None, Ly, None)) + \
-             sem_boundary_matrix.sem_multivar_boundary_hamiltonian(deg=d, deg_out=d_out, endpoints=endpoints, type='value', coords=(None, None, 0))
+    HB_sem = build_general_boundary_matrix(type='value', coords=(0, None, None), deg=d, deg_out=d_out, endpoints=endpoints)
+    HB_sem += build_general_boundary_matrix(type='value', coords=(Lx, None, None), deg=d, deg_out=d_out, endpoints=endpoints)
+    HB_sem += build_general_boundary_matrix(type='value', coords=(None, 0, None), deg=d, deg_out=d_out, endpoints=endpoints)
+    HB_sem += build_general_boundary_matrix(type='value', coords=(None, Ly, None), deg=d, deg_out=d_out, endpoints=endpoints)
+    HB_sem += build_general_boundary_matrix(type='derivative', coords=(None, None, 0), deg=d, deg_out=d_out, endpoints=endpoints)
+    #HB_sem += build_general_boundary_matrix(type='value', coords=(None, None, 0), deg=d, deg_out=d_out, endpoints=endpoints)
 
 
     HC0_sem = interface_continuity.multivar_boundary_continuity_matrix('value', num_elements_for_dims, d)
@@ -224,7 +235,7 @@ def test_wave_equation(n: int, num_elements_for_dims: np.ndarray):
     psi_sol = eigvecs[:, 0]
     print("Ground energy", eigvals[0])
     print("Spectral gap:", eigvals[1] - eigvals[0])
-    print("Solution coefficients", np.reshape(psi_sol, (mesh.num_elems, -1)).round(2))
+    print("Solution coefficients", np.reshape(psi_sol, (mesh.num_elems, -1)).round(4))
 
     f_s = function_evaluation.evaluate_multivar_sem_encoding(psi_sol=psi_sol, deg=d, deg_out=d_out, endpoints=endpoints,
                                                     coords_eval_list=np.array([data_s[0]]), scaling_factor=1.0)[0]
@@ -233,44 +244,51 @@ def test_wave_equation(n: int, num_elements_for_dims: np.ndarray):
     s_eta = data_s[1] / f_s
     print("Scaling^2:", s_eta ** 2)
 
-    # # Plot the solution at t=T/2
-    # import matplotlib.pyplot as plt
-    # x_plot = np.linspace(0, Lx, 100)
-    # y_plot = np.linspace(0, Ly, 100)
-    # X_plot, Y_plot = np.meshgrid(x_plot, y_plot)
-    # fQ_plot = np.zeros_like(X_plot)
-    #
-    # for i in range(X_plot.shape[0]):
-    #     for j in range(X_plot.shape[1]):
-    #         coord_ij = (X_plot[i, j], Y_plot[i, j], T/2)
-    #         fQ_plot[i, j] = function_evaluation.evaluate_multivar_sem_encoding(psi_sol=psi_sol, deg=d, deg_out=d_out, endpoints=endpoints,
-    #                                                 coords_eval_list=np.array([coord_ij]), scaling_factor=s_eta)[0]
-    # plt.contourf(X_plot, Y_plot, fQ_plot, levels=50, cmap='viridis')
-    # plt.colorbar(label=r'$f^*_{Q}(x,y,T/2)$')
-    # plt.title(f"Solution to Wave Equation at t=T/2: n={n}, num_elements={num_elements_for_dims}")
-    # plt.xlabel("x")
-    # plt.ylabel("y")
-    # plt.grid()
-    # plt.show()
+    # Total number of elements (3 * 3 = 9)
+    total_elements = H_sem.size
+    non_zeros = np.count_nonzero(H_sem)
+    sparsity = 1.0 - (non_zeros / total_elements)
+    print(f"Non-zeros: {non_zeros}/{total_elements}")
+    print(f"Sparsity: {sparsity * 100:.2f}%")
 
-    animate_wave_solution_sem(psi_sol=psi_sol, deg=d, deg_out=d_out, endpoints=endpoints, scaling_factor=s_eta, Lx=Lx, Ly=Ly, T=T, n=n, num_elements_for_dims=num_elements_for_dims, zlim=(-1.05, 1.05))
+    # Plot the solution at t=T/2
+    import matplotlib.pyplot as plt
+    x_plot = np.linspace(0, Lx, 10)
+    y_plot = np.linspace(0, Ly, 10)
+    X_plot, Y_plot = np.meshgrid(x_plot, y_plot)
+    fQ_plot = np.zeros_like(X_plot)
+
+    for i in range(X_plot.shape[0]):
+        for j in range(X_plot.shape[1]):
+            coord_ij = (X_plot[i, j], Y_plot[i, j], T/2)
+            fQ_plot[i, j] = function_evaluation.evaluate_multivar_sem_encoding(psi_sol=psi_sol, deg=d, deg_out=d_out, endpoints=endpoints,
+                                                    coords_eval_list=np.array([coord_ij]), scaling_factor=s_eta)[0]
+    plt.contourf(X_plot, Y_plot, fQ_plot, levels=50, cmap='viridis')
+    plt.colorbar(label=r'$f^*_{Q}(x,y,T/2)$')
+    plt.title(f"Solution to Wave Equation at t=T/2: n={n}, num_elements={num_elements_for_dims}")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.grid()
+    plt.show()
+
+    #animate_wave_solution_sem(psi_sol=psi_sol, deg=d, deg_out=d_out, endpoints=endpoints, scaling_factor=s_eta, Lx=Lx, Ly=Ly, T=T, n=n, num_elements_for_dims=num_elements_for_dims, zlim=(-1.05, 1.05))
     return
 
 def animate_wave_solution_sem(psi_sol,
                               deg,
-                deg_out,
-                endpoints,
-                scaling_factor,
-                Lx,
-                Ly,
-                T,
-                n,
-                num_elements_for_dims,
-                nx=60,
-                ny=60,
-                n_frames=60,
-                interval=100,
-                zlim=None):
+                                deg_out,
+                                endpoints,
+                                scaling_factor,
+                                Lx,
+                                Ly,
+                                T,
+                                n,
+                                num_elements_for_dims,
+                                nx=60,
+                                ny=60,
+                                n_frames=60,
+                                interval=100,
+                                zlim=None):
     """Animate the SEM solution as a 3D surface z = f(x,y,t) over t in [0, T].
 
     Notes
@@ -393,6 +411,6 @@ def animate_wave_solution_sem(psi_sol,
     return ani
 
 if __name__ == "__main__":
-    #test_ode_variable_coeff(n=8, num_elements=3)
+    #test_ode_variable_coeff(n=4, num_elements=3)
     #test_inhom_ode(n=2, num_elements=46)
     test_wave_equation(n=4, num_elements_for_dims=np.array([1, 1, 1]))

@@ -1,7 +1,7 @@
 import numpy as np
 import warnings
 
-def get_weight(k: int, deg: int) -> float:
+def get_weight(k: int, deg: int):
     """
     Return the coefficient of T_k in the generalized Chebyshev encoding
     tau_deg(x) = (T_0(x), sqrt(2) T_1(x), ..., sqrt(2) T_deg(x))^T / sqrt(deg+1).
@@ -29,7 +29,7 @@ def get_weight(k: int, deg: int) -> float:
         return np.sqrt(2.0) / norm
 
 
-def climbing_matrix(deg: int) -> np.ndarray:
+def climbing_matrix(deg: int):
     """
     Construct the multiplication matrix M_x for the generalized Chebyshev encoding
     such that
@@ -57,34 +57,39 @@ def climbing_matrix(deg: int) -> np.ndarray:
         raise ValueError("deg must be a non-negative integer.")
 
     d = deg
-    d_prime = d + 1  # target encoding degree
-    M = np.zeros((d + 1, d_prime + 1), dtype=float)
+    d_out = d + 1  # target encoding degree
+
+    in_norm, out_norm = np.sqrt(d + 1), np.sqrt(d_out + 1)
+    w_in = [1.0 / in_norm] + [np.sqrt(2.0) / in_norm] * d   # == [get_weight(j, d) for j in range(d + 1)]
+    w_out = [1.0 / out_norm] + [np.sqrt(2.0) / out_norm] * d_out    # == [get_weight(k, d_out)
+
+    M = np.zeros((d + 1, d_out + 1), dtype=float)
 
     for j in range(d + 1):
-        w_j = get_weight(j, d)
+        w_j = w_in[j]   # == get_weight(j, d)
 
         if j == 0:
             # x T_0(x) = T_1(x)
             k = 1
             a_kj = 1.0
-            w_k = get_weight(k, d_prime)
+            w_k = w_out[k]  # == get_weight(k, d_out)
             M[j, k] += w_j * a_kj / w_k
         else:
             # For n >= 1: x T_n(x) = 0.5 (T_{n+1}(x) + T_{n-1}(x))
             ## Lower index term T_{j-1}
             k_low = j - 1
             a_low = 0.5
-            w_low = get_weight(k_low, d_prime)
+            w_low = w_out[k_low]    #== get_weight(k_low, d_out)
             M[j, k_low] += w_j * a_low / w_low
             ## Upper index term T_{j+1}
             k_up = j + 1
             a_up = 0.5
-            w_up = get_weight(k_up, d_prime)
+            w_up = w_out[k_up]    #== get_weight(k_up, d_out)
             M[j, k_up] += w_j * a_up / w_up
 
     return M
 
-def M_x_power(deg: int, p: int, deg_out: int | None = None) -> np.ndarray:
+def M_x_power(p: int, deg: int, deg_out: int = None):
     """
     Construct the multiplication matrix M_{x^p} for the generalized Chebyshev encoding
     such that
@@ -156,10 +161,11 @@ def M_x_power(deg: int, p: int, deg_out: int | None = None) -> np.ndarray:
     # Special case: x^0 = 1 -> just convert tau_d to tau_{d_out}
     if p == 0:
         M = np.zeros((d + 1, d_out + 1), dtype=float)
+        in_norm, out_norm = np.sqrt(d + 1), np.sqrt(d_out + 1)
+        norm_ratio = out_norm / in_norm
         for j in range(d + 1):
-            w_d     = get_weight(j, d)
-            w_d_out = get_weight(j, d_out)
-            M[j, j] = w_d / w_d_out
+            #M[j, j] = get_weight(j, d) / get_weight(j, d_out)
+            M[j,j] = norm_ratio
         return M.T
 
     # 1) Build M_{x^p} as product of climbing matrices up to degree d+p
@@ -185,10 +191,16 @@ def M_x_power(deg: int, p: int, deg_out: int | None = None) -> np.ndarray:
     # tau_{d+p,k} = (get_weight(k, d+p) / get_weight(k, d_out)) * tau_{d_out,k}
     max_shared = min(current_deg, d_out)
     C = np.zeros((current_deg + 1, d_out + 1), dtype=float)
+
+    out_norm, curr_norm = np.sqrt(d_out + 1), np.sqrt(current_deg + 1)
+    w_out = [1.0 / out_norm] + [np.sqrt(2.0) / out_norm] * d_out    # == [get_weight(k, d_out) for k in range(d_out + 1)]
+    w_cur = [1.0 / curr_norm] + [np.sqrt(2.0) / curr_norm] * current_deg    # == [get_weight(k, current_deg) for k in range(current_deg + 1)]
+
     for k in range(max_shared + 1):
-        w_cur = get_weight(k, current_deg)
-        w_out = get_weight(k, d_out)
-        C[k, k] = w_cur / w_out
+        #w_cur = get_weight(k, current_deg)
+        #w_out = get_weight(k, d_out)
+        #C[k, k] = w_cur / w_out
+        C[k, k] = w_cur[k] / w_out[k]
     # rows k > max_shared stay zero (no contribution to any tau_{d_out} component)
 
     M = M @ C  # final shape: (d+1, d_out+1)
@@ -200,8 +212,15 @@ if __name__ == "__main__":
     N = 3
     p_max = 4
 
-    print(M_x_power(deg=3, p=0, deg_out=7))
-    print(M_x_power(deg=3, p=1, deg_out=7))
-    print(M_x_power(deg=3, p=2, deg_out=7))
-    print(M_x_power(deg=3, p=3, deg_out=7))
-    print(M_x_power(deg=3, p=4, deg_out=7))
+    M1 = M_x_power(p=0, deg=3, deg_out=7)
+    Mx = M_x_power(p=1, deg=3, deg_out=7)
+    Mx2 = M_x_power(p=2, deg=3, deg_out=7)
+    Mx3 = M_x_power(p=3, deg=3, deg_out=7)
+    Mx4 = M_x_power(p=4, deg=3, deg_out=7)
+
+    print(M1, np.linalg.norm(M1, ord=2))
+    print(Mx, np.linalg.norm(Mx, ord=2))
+    print(Mx2, np.linalg.norm(Mx2, ord=2))
+    print(Mx3, np.linalg.norm(Mx3, ord=2))
+    print(Mx4, np.linalg.norm(Mx4, ord=2))
+

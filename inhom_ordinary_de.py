@@ -1,20 +1,23 @@
 import numpy as np
-from src.utils import encoding, derivative_matrix, boundary_matrix, multiply_matrix
+from src.utils import encoding
+from src.utils.basic_operators import derivative_matrix, multiply_matrix
+from src.utils.boundary_hamiltonian import simple_boundary
+
 
 def solve_ODE(deg, deg_out, x_s, y_s, x_m):
-    GT = derivative_matrix.chebyshev_diff_matrix(deg=deg)
+    GT = derivative_matrix.diff_matrix(deg=deg)
     GT_sq = GT @ GT
 
-    M1 = multiply_matrix.M_x_power(deg, 0, deg_out=deg_out)
-    Mx = multiply_matrix.M_x_power(deg, 1, deg_out=deg_out)
-    Mx2 = multiply_matrix.M_x_power(deg, 2, deg_out=deg_out)
+    M1 = multiply_matrix.M_x_power(0, deg, deg_out=deg_out)
+    Mx = multiply_matrix.M_x_power(1, deg, deg_out=deg_out)
+    Mx2 = multiply_matrix.M_x_power(2, deg, deg_out=deg_out)
 
-    D0_s = boundary_matrix.regular_value_boundary_matrix(deg, x_s, y_s)
+    D0_s = boundary_matrix.regular_value_boundary_matrix(x_s, y_s, deg)
 
     A = (Mx - M1) @ GT_sq - Mx @ GT + M1 - (Mx2 - 2*Mx + M1) @ D0_s
     H = A.T @ A
 
-    Bm = boundary_matrix.zero_value_boundary_matrix(deg_out, x_z=x_m)
+    Bm = boundary_matrix.zero_value_boundary_matrix(x_z=x_m, deg=deg_out)
     Bm_M_GT = Bm @ M1 @ GT
     H += Bm_M_GT.T @ Bm_M_GT
 

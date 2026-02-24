@@ -1,23 +1,25 @@
-from src.utils import multivar_equation_parsing, multiply_matrix, derivative_matrix, boundary_matrix
+from src.utils.basic_operators import derivative_matrix, multiply_matrix
+from src.utils.boundary_hamiltonian.simple_boundary import build_boundary_matrix
+from src.utils.diffeq_hamiltonian import multivar_equation_parsing
 
 import numpy as np
 import sympy as sp
 import functools
 import warnings
 from typing import Dict, Tuple, Any, Optional, List, Literal
-#from scipy import sparse
 
-def _free_coeff_op_multivariable(d: int, d_out: int, c: sp.Expr, vars: list, truncated_order: int = None):
+def _free_coeff_op_multivariable(d: int, d_out: int, c: sp.Expr, vars: list, truncated_order: int = None, computed_Mxp: dict = None):
     c = sp.sympify(c)
     vars = list(vars)
-    computed_Mxp = {}
+    if computed_Mxp is None or computed_Mxp == {}:
+        computed_Mxp = {}
 
 
     # 1. Handle Scalar Case
     if c.is_Number:
         # p=0 represents the identity-like operator for every variable.
-        computed_Mxp[0] = multiply_matrix.M_x_power(deg=d, p=0, deg_out=d_out)
-        return float(c) * functools.reduce(np.kron, [computed_Mxp[0]] * len(vars))
+        computed_Mxp[0] = multiply_matrix.M_x_power(p=0, deg=d, deg_out=d_out)
+        return float(c) * functools.reduce(np.kron, [computed_Mxp[0]] * len(vars)), computed_Mxp
 
     # 2. Handle Non-Polynomials via Multivariable Taylor Expansion
     if any(not c.is_polynomial(v) for v in vars):
@@ -44,7 +46,7 @@ def _free_coeff_op_multivariable(d: int, d_out: int, c: sp.Expr, vars: list, tru
         for i, p in enumerate(powers):
             # Generate the operator for variable vars[i] raised to power p
             if p not in computed_Mxp:
-                M_p = multiply_matrix.M_x_power(deg=d, p=p, deg_out=d_out)
+                M_p = multiply_matrix.M_x_power(p=p, deg=d, deg_out=d_out)
                 computed_Mxp[p] = M_p
             else:
                 M_p = computed_Mxp[p]
@@ -53,7 +55,7 @@ def _free_coeff_op_multivariable(d: int, d_out: int, c: sp.Expr, vars: list, tru
 
         A += float(scalar) * functools.reduce(np.kron, term_operators)
 
-    return A.astype(float)
+    return A.astype(float), computed_Mxp
 
 def build_multivar_equation_operator(
         d: int,
@@ -140,18 +142,15 @@ def build_multivar_equation_operator(
 
             for i in range(n_vars):
                 # Note: Assuming build_boundary_matrix handles scalar y correctly or ignores it for the operator structure
-                D_regs[i] = boundary_matrix.build_boundary_matrix(
-                    type=regular_data_type,
-                    deg=d,
-                    deg_out=d,
-                    x=regular_coords[i]
-                )
+                D_regs[i] = build_boundary_matrix(type=regular_data_type, x=regular_coords[i], y=None,
+                                                                  deg=d, deg_out=d)
 
     # 3. Pre-compute Base Matrices
-    GT = derivative_matrix.chebyshev_diff_matrix(deg=d)
+    GT = derivative_matrix.diff_matrix(deg=d)
     Id = np.eye(d + 1)
 
     A_total = 0.0
+    computed_Mxp = {}
 
     # 4. Iterate over terms to build Operator A
     for (deriv_signature, k_pow), coeff in terms_dict.items():
@@ -199,12 +198,13 @@ def build_multivar_equation_operator(
             combined_op = combined_op / float(regular_value)
 
         # --- B. Apply Coefficient ---
-        coeff_op = _free_coeff_op_multivariable(
+        coeff_op, computed_Mxp = _free_coeff_op_multivariable(
             d=d,
             d_out=d_out,
             c=coeff,
             vars=vars,
-            truncated_order=truncated_order
+            truncated_order=truncated_order,
+            computed_Mxp = computed_Mxp
         )
 
         A_total += coeff_op @ combined_op

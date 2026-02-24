@@ -1,35 +1,8 @@
 import numpy as np
 import warnings
-from src.utils import multiply_matrix
+from src.utils.basic_operators import multiply_matrix
 
-def get_weight(k: int, deg: int) -> float:
-    """
-    Return the coefficient of T_k in the generalized Chebyshev encoding
-    tau_deg(x) = (T_0(x), sqrt(2) T_1(x), ..., sqrt(2) T_deg(x))^T / sqrt(deg+1).
-
-    Parameters
-    ----------
-    k : int
-        Chebyshev degree index (0 <= k <= deg).
-    deg : int
-        Maximum Chebyshev degree of the encoding.
-
-    Returns
-    -------
-    w : float
-        The scalar weight such that the k-th component of tau_deg(x) is
-        w * T_k(x).
-    """
-    if k < 0 or k > deg:
-        raise ValueError("k must satisfy 0 <= k <= deg.")
-
-    norm = np.sqrt(deg + 1.0)
-    if k == 0:
-        return 1.0 / norm
-    else:
-        return np.sqrt(2.0) / norm
-
-def N1_matrix(deg: int, deg_out: int | None = None) -> np.ndarray:
+def N1_matrix(deg: int, deg_out: int = None):
     """
     Construct the self-multiplication operator N_1 such that
         vec( tau_d(x) ⊗ tau_d(x) ) = N_1 @ tau_{deg_out}(x),
@@ -85,14 +58,16 @@ def N1_matrix(deg: int, deg_out: int | None = None) -> np.ndarray:
     N1 = np.zeros(((d + 1) * (d + 1), d_out + 1), dtype=float)
 
     # Precompute weights
-    w_d = [get_weight(i, d) for i in range(d + 1)]
-    w_out = [get_weight(k, d_out) for k in range(d_out + 1)]
+    in_norm, out_norm = np.sqrt(d + 1), np.sqrt(d_out + 1)
+    w_in = [1.0 / in_norm] + [np.sqrt(2.0) / in_norm] * d   # == [get_weight(j, d) for j in range(d + 1)]
+    w_out = [1.0 / out_norm] + [np.sqrt(2.0) / out_norm] * d_out    # == [get_weight(k, d_out) for k in range(d_out + 1)]
+
 
     # Use T_n T_m = 1/2 (T_{n+m} + T_{|n-m|})
     for i in range(d + 1):
         for j in range(d + 1):
             idx = i * (d + 1) + j         # row index in vec(tau_d ⊗ tau_d)
-            alpha = 0.5 * w_d[i] * w_d[j] # prefactor in front of T_i T_j
+            alpha = 0.5 * w_in[i] * w_in[j] # prefactor in front of T_i T_j
 
             # Contribution to T_{i+j}
             k1 = i + j
@@ -106,7 +81,7 @@ def N1_matrix(deg: int, deg_out: int | None = None) -> np.ndarray:
 
     return N1.T
 
-def Nx_matrix(deg: int, deg_out: int | None = None) -> np.ndarray:
+def Nx_matrix(deg: int, deg_out: int = None):
     """
     Construct the operator N_x such that
         x * vec( tau_d(x) ⊗ tau_d(x) ) = N_x @ tau_{deg_out}(x),
@@ -173,7 +148,7 @@ def Nx_matrix(deg: int, deg_out: int | None = None) -> np.ndarray:
     N1 = N1_matrix(d, d_mid).T
 
     # x * tau_{d_mid}(x) = M_x_power(d_mid, 1, d_out) @ tau_{d_out}(x)
-    Mx = multiply_matrix.M_x_power(d_mid, 1, d_out).T
+    Mx = multiply_matrix.M_x_power(1, d_mid, d_out).T
 
     # x * vec(tau_d ⊗ tau_d) = N1 @ Mx @ tau_{d_out}(x)
     Nx = N1 @ Mx

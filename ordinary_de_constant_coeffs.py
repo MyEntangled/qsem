@@ -1,12 +1,14 @@
 import numpy as np
-from src.utils import derivative_matrix, boundary_matrix, encoding
+from src.utils import encoding
+from src.utils.basic_operators import derivative_matrix
+from src.utils.boundary_hamiltonian import simple_boundary
 
 
 def solve_ODE(deg, a,b,c,x_z):
-    G_T = derivative_matrix.chebyshev_diff_matrix(deg=deg)
+    G_T = derivative_matrix.diff_matrix(deg=deg)
 
     A = a * G_T @ G_T + b * G_T + c * np.eye(deg+1)
-    B = boundary_matrix.zero_value_boundary_matrix(deg=deg, x_z=x_z)
+    B = boundary_matrix.zero_value_boundary_matrix(x_z=x_z, deg=deg)
     #B_hat = boundary_matrix.zero_derivative_boundary_matrix(deg=3, x_m=0.0)
 
     T_A = A.T @ A

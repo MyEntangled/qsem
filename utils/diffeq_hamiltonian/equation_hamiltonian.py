@@ -1,8 +1,9 @@
 import sympy as sp
 import numpy as np
-import scipy
-from src.utils import boundary_matrix, derivative_matrix, multiply_matrix, tensor_mult_matrix, equation_parsing, \
-    function_evaluation, interface_continuity, sem_boundary_matrix
+from src.utils import function_evaluation, interface_continuity
+from src.utils.basic_operators import derivative_matrix, multiply_matrix, tensor_mult_matrix
+from src.utils.diffeq_hamiltonian import equation_parsing
+from src.utils.boundary_hamiltonian.simple_boundary import build_boundary_matrix
 import functools
 import warnings
 from typing import Dict, Tuple, Optional, Any, Literal
@@ -12,7 +13,7 @@ def _free_coeff_op(d:int, d_out:int, c:sp.Expr, var:sp.Symbol, truncated_order:i
 
     # Special case: scalar coefficient c = c0
     if c.is_Number:
-        M_1 = multiply_matrix.M_x_power(deg=d, p=0, deg_out=d_out)
+        M_1 = multiply_matrix.M_x_power(p=0, deg=d, deg_out=d_out)
         return float(c) * M_1
 
     if not c.is_polynomial(var):
@@ -30,7 +31,7 @@ def _free_coeff_op(d:int, d_out:int, c:sp.Expr, var:sp.Symbol, truncated_order:i
     for term in c_terms:
         power = sp.degree(term, gen=var)
         scalar = term.coeff(var, power)
-        M_xp = multiply_matrix.M_x_power(deg=d, p=power, deg_out=d_out)
+        M_xp = multiply_matrix.M_x_power(p=power, deg=d, deg_out=d_out)
         A += scalar * M_xp
     return A
 
@@ -70,7 +71,7 @@ def build_equation_operator(
         raise NotImplementedError("N1_matrix strictly supports Rank 2 reduction.")
 
     # 2. Pre-compute Base Matrices
-    GT = derivative_matrix.chebyshev_diff_matrix(deg=d)
+    GT = derivative_matrix.diff_matrix(deg=d)
     Id = np.eye(d + 1)
 
     # 3. Regular constraint operator (only build if actually needed)
@@ -108,7 +109,7 @@ def build_equation_operator(
             if regular_data_type == 'value':
                 raise ValueError("Regular value y_s should be non-zero.")
 
-        D_reg = boundary_matrix.build_boundary_matrix(type=regular_data_type, deg=d, x=regular_x, y=regular_y)
+        D_reg = build_boundary_matrix(type=regular_data_type, x=regular_x, y=regular_y, deg=d)
 
     A = 0.0
 
@@ -267,8 +268,6 @@ def sem_equation_hamiltonian(d: int,
 
 
 if __name__ == "__main__":
-    from src.utils import equation_parsing, encoding, boundary_matrix
-
     ## Testing the build_H_diff function with a sample ODE
 
     n = 5
@@ -336,7 +335,8 @@ if __name__ == "__main__":
     # H += B.T @ B
 
     x_m = 0.0  # -0.195976
-    B_sem = sem_boundary_matrix.sem_boundary_hamiltonian(type='derivative', deg=d, deg_out=d_out, endpoints=endpoints, x=x_m)
+    B_sem = sem_boundary_matrix.sem_boundary_hamiltonian(type='derivative', x=x_m, deg=d, deg_out=d_out,
+                                                         endpoints=endpoints)
     H_sem += B_sem
 
     num_elements = endpoints.shape[0]

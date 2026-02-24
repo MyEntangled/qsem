@@ -1,7 +1,9 @@
 import numpy as np
-from src.utils import multiply_matrix, encoding, derivative_matrix
+from src.utils import encoding
+from src.utils.basic_operators import derivative_matrix, multiply_matrix
 
-def zero_value_boundary_matrix(deg: int, x_z: float, deg_out: int = None):
+
+def zero_value_boundary_matrix(x_z: float, deg: int, deg_out: int = None):
     """Construct the boundary matrix enforcing a homogeneous value condition f(x_z) = 0.
 
         In the project's notation, the condition
@@ -45,10 +47,10 @@ def zero_value_boundary_matrix(deg: int, x_z: float, deg_out: int = None):
     else:
         if deg_out < deg:
             raise ValueError("deg_out must be greater than or equal to deg.")
-        M1 = multiply_matrix.M_x_power(deg=deg, p=0, deg_out=deg_out)
+        M1 = multiply_matrix.M_x_power(p=0, deg=deg, deg_out=deg_out)
         return M1 @ B
 
-def zero_derivative_boundary_matrix(deg: int, x_m: float, deg_out: int = None):
+def zero_derivative_boundary_matrix(x_m: float, deg: int, deg_out: int = None):
     """Construct the boundary matrix enforcing a homogeneous derivative condition f'(x_m) = 0.
 
         This builds the matrix \\hat{B}(x_m) that represents evaluation of the derivative at `x_m`.
@@ -80,18 +82,18 @@ def zero_derivative_boundary_matrix(deg: int, x_m: float, deg_out: int = None):
             If `deg_out < deg`.
         """
 
-    B = zero_value_boundary_matrix(deg, x_m)
-    B_hat = B @ derivative_matrix.chebyshev_diff_matrix(deg, deg_out=None)
+    B = zero_value_boundary_matrix(x_m, deg)
+    B_hat = B @ derivative_matrix.diff_matrix(deg, deg_out=None)
 
     if deg_out is None:
         return B_hat
     else:
         if deg_out < deg:
             raise ValueError("deg_out must be greater than or equal to deg.")
-        M1 = multiply_matrix.M_x_power(deg=deg, p=0, deg_out=deg_out)
+        M1 = multiply_matrix.M_x_power(p=0, deg=deg, deg_out=deg_out)
         return M1 @ B_hat
 
-def regular_value_boundary_matrix(deg: int, x_s: float, y_s: float, deg_out: int = None):
+def regular_value_boundary_matrix(x_s: float, y_s: float, deg: int, deg_out: int = None):
     """Construct a boundary matrix enforcing an inhomogeneous value condition f(x_s) = y_s.
 
         The matrix is the normalized version of the homogeneous value matrix:
@@ -130,7 +132,7 @@ def regular_value_boundary_matrix(deg: int, x_s: float, y_s: float, deg_out: int
         produce infinities.
         """
 
-    B = zero_value_boundary_matrix(deg, x_s)
+    B = zero_value_boundary_matrix(x_s, deg)
     D0 = B / y_s
 
     if deg_out is None:
@@ -138,10 +140,10 @@ def regular_value_boundary_matrix(deg: int, x_s: float, y_s: float, deg_out: int
     else:
         if deg_out < deg:
             raise ValueError("deg_out must be greater than or equal to deg.")
-        M1 = multiply_matrix.M_x_power(deg=deg, p=0, deg_out=deg_out)
+        M1 = multiply_matrix.M_x_power(p=0, deg=deg, deg_out=deg_out)
         return M1 @ D0
 
-def regular_derivative_boundary_matrix(deg: int, x_s: float, t_s: float, deg_out: int = None):
+def regular_derivative_boundary_matrix(x_s: float, t_s: float, deg: int, deg_out: int = None):
     """Construct a boundary matrix enforcing an inhomogeneous derivative condition f'(x_s) = t_s.
 
         This is the normalized version of the homogeneous derivative matrix:
@@ -180,17 +182,17 @@ def regular_derivative_boundary_matrix(deg: int, x_s: float, t_s: float, deg_out
         produce infinities.
         """
 
-    B_hat = zero_derivative_boundary_matrix(deg, x_s)
+    B_hat = zero_derivative_boundary_matrix(x_s, deg)
     D1 = B_hat / t_s
     if deg_out is None:
         return D1
     else:
         if deg_out < deg:
             raise ValueError("deg_out must be greater than or equal to deg.")
-        M1 = multiply_matrix.M_x_power(deg=deg, p=0, deg_out=deg_out)
+        M1 = multiply_matrix.M_x_power(p=0, deg=deg, deg_out=deg_out)
         return M1 @ D1
 
-def build_boundary_matrix(type: str, deg: int, x: float, y: float = None, deg_out: int = None):
+def build_boundary_matrix(type: str, x: float, y: float, deg: int, deg_out: int = None):
     """Factory for boundary matrices (value or derivative; homogeneous or inhomogeneous).
 
     Parameters
@@ -222,14 +224,14 @@ def build_boundary_matrix(type: str, deg: int, x: float, y: float = None, deg_ou
 
     if type == 'value':
         if y is None:
-            B = zero_value_boundary_matrix(deg, x, deg_out)
+            B = zero_value_boundary_matrix(x, deg, deg_out)
         else:
-            B = regular_value_boundary_matrix(deg, x, y, deg_out)
+            B = regular_value_boundary_matrix(x, y, deg, deg_out)
     elif type == 'derivative':
         if y is None:
-            B = zero_derivative_boundary_matrix(deg, x, deg_out)
+            B = zero_derivative_boundary_matrix(x, deg, deg_out)
         else:
-            B = regular_derivative_boundary_matrix(deg, x, y, deg_out)
+            B = regular_derivative_boundary_matrix(x, y, deg, deg_out)
     else:
         raise ValueError("type must be either 'value' or 'derivative'.")
     return B
@@ -239,17 +241,17 @@ if __name__ == '__main__':
     d_in = 33
     d_out = 135
 
-    M1 = multiply_matrix.M_x_power(deg=d_in, p=0, deg_out=d_out)
-    GT = derivative_matrix.chebyshev_diff_matrix(deg=d_in)
-    B_in = zero_value_boundary_matrix(deg=d_in, x_z=-1)
-    B_out = zero_value_boundary_matrix(deg=d_out, x_z=-1)
+    M1 = multiply_matrix.M_x_power(p=0, deg=d_in, deg_out=d_out)
+    GT = derivative_matrix.diff_matrix(deg=d_in)
+    B_in = zero_value_boundary_matrix(x_z=-1, deg=d_in)
+    B_out = zero_value_boundary_matrix(x_z=-1, deg=d_out)
 
     type_1 = M1 @ B_in @ GT
     type_2 = B_out @ M1 @ GT
-    type_3 = zero_derivative_boundary_matrix(d_in, -1, d_out)
+    type_3 = zero_derivative_boundary_matrix(-1, d_in, d_out)
     print(np.linalg.norm(type_1 - type_2), np.linalg.norm(type_2 - type_3))
 
     type_1 = M1 @ B_in
     type_2 = B_out @ M1
-    type_3 = zero_value_boundary_matrix(d_in, -1, d_out)
+    type_3 = zero_value_boundary_matrix(-1, d_in, d_out)
     print(np.linalg.norm(type_1 - type_2), np.linalg.norm(type_2 - type_3))

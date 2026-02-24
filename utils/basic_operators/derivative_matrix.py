@@ -1,33 +1,6 @@
 import numpy as np
 
-def get_weight(k: int, deg: int) -> float:
-    """
-    Return the coefficient of T_k in the generalized Chebyshev encoding
-    tau_deg(x) = (T_0(x), sqrt(2) T_1(x), ..., sqrt(2) T_deg(x))^T / sqrt(deg+1).
-
-    Parameters
-    ----------
-    k : int
-        Chebyshev degree index (0 <= k <= deg).
-    deg : int
-        Maximum Chebyshev degree of the encoding.
-
-    Returns
-    -------
-    w : float
-        The scalar weight such that the k-th component of tau_deg(x) is
-        w * T_k(x).
-    """
-    if k < 0 or k > deg:
-        raise ValueError("k must satisfy 0 <= k <= deg.")
-
-    norm = np.sqrt(deg + 1.0)
-    if k == 0:
-        return 1.0 / norm
-    else:
-        return np.sqrt(2.0) / norm
-
-def chebyshev_diff_matrix(deg: int, deg_out: int | None = None) -> np.ndarray:
+def diff_matrix(deg: int, deg_out: int | None = None) -> np.ndarray:
     """
     Construct the differentiation matrix G for the generalized Chebyshev encoding
     tau_deg(x) = (T_0(x), sqrt(2) T_1(x), ..., sqrt(2) T_deg(x))^T / sqrt(deg+1),
@@ -116,8 +89,9 @@ def chebyshev_diff_matrix(deg: int, deg_out: int | None = None) -> np.ndarray:
     G = np.zeros((d + 1, d_out + 1), dtype=float)
 
     # Precompute weights
-    w_in = [get_weight(j, d) for j in range(d + 1)]
-    w_out = [get_weight(k, d_out) for k in range(d_out + 1)]
+    in_norm, out_norm = np.sqrt(d + 1), np.sqrt(d_out + 1)
+    w_in = [1.0 / in_norm] + [np.sqrt(2.0) / in_norm] * d   # == [get_weight(j, d) for j in range(d + 1)]
+    w_out = [1.0 / out_norm] + [np.sqrt(2.0) / out_norm] * d_out    # == [get_weight(k, d_out) for k in range(d_out + 1)]
 
     # j = 0: derivative of T_0 is zero -> row stays zero
     for j in range(1, d + 1):
@@ -148,5 +122,5 @@ def chebyshev_diff_matrix(deg: int, deg_out: int | None = None) -> np.ndarray:
 
 
 if __name__ == "__main__":
-    G_T = chebyshev_diff_matrix(deg=3, deg_out=None)
+    G_T = diff_matrix(deg=3, deg_out=None)
     print(G_T)

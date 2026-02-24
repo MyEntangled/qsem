@@ -1,18 +1,20 @@
 import numpy as np
 
-from src.utils import boundary_matrix, derivative_matrix, multiply_matrix
+from src.utils.basic_operators import multiply_matrix
+from src.utils.boundary_hamiltonian.simple_boundary import build_boundary_matrix
+
 
 def boundary_continuity_matrice(type: str, M: int, deg: int, deg_out: int = None):
-    """Assemble the 1D continuity penalty matrix across element interfaces.
+    """Assemble the 1D boundary_hamiltonian penalty matrix across element interfaces.
 
-    This function constructs a global block matrix enforcing continuity conditions
+    This function constructs a global block matrix enforcing boundary_hamiltonian conditions
     between adjacent 1D spectral (Chebyshev) elements. Continuity is imposed using
     boundary matrices at the left (x = -1) and right (x = 1) endpoints of each element.
 
     The choice of boundary operator depends on `type`:
 
-    - `type = 'value'` enforces C^0 continuity (function values match).
-    - `type = 'derivative'` enforces C^1 continuity (first derivatives match).
+    - `type = 'value'` enforces C^0 boundary_hamiltonian (function values match).
+    - `type = 'derivative'` enforces C^1 boundary_hamiltonian (first derivatives match).
 
     Parameters
     ----------
@@ -30,7 +32,7 @@ def boundary_continuity_matrice(type: str, M: int, deg: int, deg_out: int = None
     Returns
     -------
     numpy.ndarray
-        Global continuity matrix of shape ((deg+1)*M, (deg+1)*M).
+        Global boundary_hamiltonian matrix of shape ((deg+1)*M, (deg+1)*M).
         The matrix is symmetric positive semidefinite; its nullspace corresponds
         to globally continuous functions (or derivatives).
 
@@ -43,8 +45,8 @@ def boundary_continuity_matrice(type: str, M: int, deg: int, deg_out: int = None
     if deg_out is None:
         deg_out = deg
 
-    B_left = boundary_matrix.build_boundary_matrix(type, deg, x=-1, deg_out=deg_out)
-    B_right = boundary_matrix.build_boundary_matrix(type, deg, x=1, deg_out=deg_out)
+    B_left = build_boundary_matrix(type, x=-1, y=None, deg=deg, deg_out=deg_out)
+    B_right = build_boundary_matrix(type, x=1, y=None, deg=deg, deg_out=deg_out)
 
     B_ll = B_left.T @ B_left
     B_rr = B_right.T @ B_right
@@ -68,16 +70,16 @@ def boundary_continuity_matrice(type: str, M: int, deg: int, deg_out: int = None
     return C
 
 def boundary_continuity_matrice_alternative(type: str, M: int, deg: int, deg_out: int = None):
-    """Assemble the 1D continuity penalty matrix across element interfaces.
+    """Assemble the 1D boundary_hamiltonian penalty matrix across element interfaces.
 
-    This function constructs a global block matrix enforcing continuity conditions
+    This function constructs a global block matrix enforcing boundary_hamiltonian conditions
     between adjacent 1D spectral (Chebyshev) elements. Continuity is imposed using
     boundary matrices at the left (x = -1) and right (x = 1) endpoints of each element.
 
     The choice of boundary operator depends on `type`:
 
-    - `type = 'value'` enforces C^0 continuity (function values match).
-    - `type = 'derivative'` enforces C^1 continuity (first derivatives match).
+    - `type = 'value'` enforces C^0 boundary_hamiltonian (function values match).
+    - `type = 'derivative'` enforces C^1 boundary_hamiltonian (first derivatives match).
 
     Parameters
     ----------
@@ -95,7 +97,7 @@ def boundary_continuity_matrice_alternative(type: str, M: int, deg: int, deg_out
     Returns
     -------
     numpy.ndarray
-        Global continuity matrix of shape ((deg+1)*M, (deg+1)*M).
+        Global boundary_hamiltonian matrix of shape ((deg+1)*M, (deg+1)*M).
         The matrix is symmetric positive semidefinite; its nullspace corresponds
         to globally continuous functions (or derivatives).
 
@@ -108,8 +110,8 @@ def boundary_continuity_matrice_alternative(type: str, M: int, deg: int, deg_out
     if deg_out is None:
         deg_out = deg
 
-    B_left = boundary_matrix.build_boundary_matrix(type, deg, x=-1, deg_out=deg_out)
-    B_right = boundary_matrix.build_boundary_matrix(type, deg, x=1, deg_out=deg_out)
+    B_left = build_boundary_matrix(type, x=-1, y=None, deg=deg, deg_out=deg_out)
+    B_right = build_boundary_matrix(type, x=1, y=None, deg=deg, deg_out=deg_out)
 
     #  H = sum_e C_{e, e+1}^T C_{e, e+1}, where
     #  C_{e, e+1} = |e\rangle\langle e| \otimes B_n(1) - |e\rangle\langle e+1| \otimes B_n(-1)
@@ -125,7 +127,7 @@ def boundary_continuity_matrice_alternative(type: str, M: int, deg: int, deg_out
     return C
 
 
-# --- Multivariate nD continuity penalty matrix ---
+# --- Multivariate nD boundary_hamiltonian penalty matrix ---
 
 def multivar_boundary_continuity_matrix(
     type: str,
@@ -133,7 +135,7 @@ def multivar_boundary_continuity_matrix(
     deg: int,
     deg_out: int = None,
 ):
-    """Assemble the nD continuity penalty matrix across element interfaces.
+    """Assemble the nD boundary_hamiltonian penalty matrix across element interfaces.
 
     This is the nD analogue of `boundary_continuity_matrice()` /
     `boundary_continuity_matrice_alternative()` for an axis-aligned tensor-product
@@ -167,7 +169,7 @@ def multivar_boundary_continuity_matrix(
     Returns
     -------
     numpy.ndarray
-        Global continuity penalty matrix of shape (M*(deg+1)^n, M*(deg+1)^n),
+        Global boundary_hamiltonian penalty matrix of shape (M*(deg+1)^n, M*(deg+1)^n),
         where M = prod_d N[d]. The matrix is symmetric positive semidefinite.
 
     Notes
@@ -201,11 +203,11 @@ def multivar_boundary_continuity_matrix(
     in_block = (deg + 1) ** num_variables
 
     # 1D boundary operators on reference interval endpoints.
-    B_left_1d = boundary_matrix.build_boundary_matrix(type, deg, x=-1, deg_out=deg_out)
-    B_right_1d = boundary_matrix.build_boundary_matrix(type, deg, x=1, deg_out=deg_out)
+    B_left_1d = build_boundary_matrix(type, x=-1, y=None, deg=deg, deg_out=deg_out)
+    B_right_1d = build_boundary_matrix(type, x=1, y=None, deg=deg, deg_out=deg_out)
 
     # Identity-like lift for unconstrained dimensions
-    M1 = multiply_matrix.M_x_power(deg, 0, deg_out)
+    M1 = multiply_matrix.M_x_power(0, deg, deg_out)
 
     # Precompute face operators for each dimension v:
     #   B_face_right[v] corresponds to xi_v = +1 on the left element
@@ -276,6 +278,137 @@ def multivar_boundary_continuity_matrix(
     return C
 
 
+
+def vector_multivar_boundary_continuity_matrix(
+        type: str,
+        M_list: list,
+        num_components: int,
+        deg: int,
+        deg_out: int = None,
+):
+    """
+    Assemble the nD boundary continuity matrix for vector-valued functions.
+
+    Tensor Order: |element> |component> |spatial>
+    ---------------------------------------------
+    The resulting matrix is block-structured.
+    - The largest blocks correspond to Elements.
+    - Inside each Element block, we have sub-blocks for Components (u, v, ...).
+    - Inside each Component sub-block, we have the Spatial operator.
+
+    Parameters
+    ----------
+    type : str
+        'value' or 'derivative'.
+    M_list : list
+        Elements per dimension [Nx, Ny, ...].
+    deg : int
+        Polynomial degree.
+    num_components : int
+        Number of vector components.
+    deg_out : int, optional
+        Output degree for spectral operators.
+
+    Returns
+    -------
+    C : np.ndarray
+        Global continuity matrix.
+    """
+    if deg_out is None:
+        deg_out = deg
+
+    num_variables = len(M_list)
+    N = list(M_list)
+
+    # --- 1. Construct Scalar Spatial Operators ---
+    # These act on |psi_spatial>
+
+    B_left_1d = boundary_matrix.build_boundary_matrix(type, x=-1, y=None, deg=deg, deg_out=deg_out)
+    B_right_1d = boundary_matrix.build_boundary_matrix(type, x=1, y=None, deg=deg, deg_out=deg_out)
+    M1 = multiply_matrix.M_x_power(0, deg, deg_out)  # Identity lift
+
+    spatial_in_size = (deg + 1) ** num_variables
+
+    # Precompute scalar face operators (Tensor product directions)
+    B_face_right = []
+    B_face_left = []
+
+    for v in range(num_variables):
+        B_r = None
+        B_l = None
+        for d in range(num_variables):
+            if d == v:
+                Br_d, Bl_d = B_right_1d, B_left_1d
+            else:
+                Br_d, Bl_d = M1, M1
+
+            B_r = Br_d if B_r is None else np.kron(B_r, Br_d)
+            B_l = Bl_d if B_l is None else np.kron(B_l, Bl_d)
+
+        B_face_right.append(B_r)
+        B_face_left.append(B_l)
+
+    # Compute Scalar Interaction Blocks (Spatial x Spatial)
+    q_rr_scalar = [bf.T @ bf for bf in B_face_right]
+    q_ll_scalar = [bf.T @ bf for bf in B_face_left]
+    q_rl_scalar = [bf.T @ bf_l for bf, bf_l in zip(B_face_right, B_face_left)]
+    q_lr_scalar = [bf_l.T @ bf for bf, bf_l in zip(B_face_right, B_face_left)]
+
+    # --- 2. Expand to Vector Operators ---
+    # Target Structure: |component> |spatial>
+    # We use Kronecker product: I_comp (outer) (x) Q_scalar (inner)
+    # Result: Block Diagonal with Q_scalar repeated 'num_components' times.
+
+    I_comp = np.eye(num_components)
+
+    Q_rr = [np.kron(I_comp, q) for q in q_rr_scalar]
+    Q_ll = [np.kron(I_comp, q) for q in q_ll_scalar]
+    Q_rl = [np.kron(I_comp, q) for q in q_rl_scalar]
+    Q_lr = [np.kron(I_comp, q) for q in q_lr_scalar]
+
+    # --- 3. Assemble Global Matrix ---
+    # Target Structure: |element> |component> |spatial>
+
+    M_total = int(np.prod(N))
+    block_size = num_components * spatial_in_size
+    C = np.zeros((block_size * M_total, block_size * M_total))
+
+    # Helper for strides
+    strides = [1] * num_variables
+    for d in range(num_variables - 2, -1, -1):
+        strides[d] = strides[d + 1] * N[d + 1]
+
+    def flat_index(idx):
+        return int(sum(idx[d] * strides[d] for d in range(num_variables)))
+
+    # Loop over all interfaces in all dimensions
+    for v in range(num_variables):
+        for idx in np.ndindex(*N):
+            if idx[v] >= N[v] - 1:
+                continue
+
+            # Identify neighbors
+            idx_nb = list(idx)
+            idx_nb[v] += 1
+            idx_nb = tuple(idx_nb)
+
+            e = flat_index(idx)
+            f = flat_index(idx_nb)
+
+            # Calculate Global Offsets (based on Element Index e)
+            # This enforces the |element> outer structure
+            e0, e1 = e * block_size, (e + 1) * block_size
+            f0, f1 = f * block_size, (f + 1) * block_size
+
+            # Add Vector Blocks
+            C[e0:e1, e0:e1] += Q_rr[v]
+            C[f0:f1, f0:f1] += Q_ll[v]
+            C[e0:e1, f0:f1] += -Q_rl[v]
+            C[f0:f1, e0:e1] += -Q_lr[v]
+
+    return C
+
+
 if __name__ == '__main__':
     M = 4
     n = 2
@@ -336,21 +469,21 @@ if __name__ == '__main__':
             f_i.append(np.dot(eigvecs_0_zero[:, i][e*(deg+1):(e+1)*(deg+1)], encoding.chebyshev_encoding(deg, xi)))
         plt.plot(x_plot, f_i, label=f"C0 eig {i}")
 
-    # for i in range(zero_eigvals_1):
-    #     f_i = []
-    #     for x in x_plot:
-    #         e = min(int((x + 1) / 2 * M), M-1)
-    #         xi = (2 * x - (2*e/M - 1 + 2*(e+1)/M - 1)) / (2/M)  # Map to [-1, 1]
-    #         f_i.append(np.dot(eigvecs_1_zero[:, i][e*(deg+1):(e+1)*(deg+1)], encoding.chebyshev_encoding(deg, xi)))
-    #     plt.plot(x_plot, f_i, label=f"C1 eig {i}")
+    for i in range(zero_eigvals_1):
+        f_i = []
+        for x in x_plot:
+            e = min(int((x + 1) / 2 * M), M-1)
+            xi = (2 * x - (2*e/M - 1 + 2*(e+1)/M - 1)) / (2/M)  # Map to [-1, 1]
+            f_i.append(np.dot(eigvecs_1_zero[:, i][e*(deg+1):(e+1)*(deg+1)], encoding.chebyshev_encoding(deg, xi)))
+        plt.plot(x_plot, f_i, label=f"C1 eig {i}")
 
-    # for i in range(zero_eigvals):
-    #     f_i = []
-    #     for x in x_plot:
-    #         e = min(int((x + 1) / 2 * M), M-1)
-    #         xi = (2 * x - (2*e/M - 1 + 2*(e+1)/M - 1)) / (2/M)  # Map to [-1, 1]
-    #         f_i.append(np.dot(eigvecs_zero[:, i][e*(deg+1):(e+1)*(deg+1)], encoding.chebyshev_encoding(deg, xi)))
-    #     plt.plot(x_plot, f_i, label=f"C eig {i}", alpha=0.75)
+    for i in range(zero_eigvals):
+        f_i = []
+        for x in x_plot:
+            e = min(int((x + 1) / 2 * M), M-1)
+            xi = (2 * x - (2*e/M - 1 + 2*(e+1)/M - 1)) / (2/M)  # Map to [-1, 1]
+            f_i.append(np.dot(eigvecs_zero[:, i][e*(deg+1):(e+1)*(deg+1)], encoding.chebyshev_encoding(deg, xi)))
+        plt.plot(x_plot, f_i, label=f"C eig {i}", alpha=0.75)
 
     plt.legend()
     plt.title("Functions in the lowest eigenspace of C0 and C1")
@@ -359,8 +492,34 @@ if __name__ == '__main__':
     plt.grid()
     plt.show()
 
+    ##############
+    # Sanity Check for Matrix Structure
+    M_list = [2]  # 2 elements in 1D
+    deg = 2
+    n_comp = 2  # u, v
 
+    C = vector_multivar_boundary_continuity_matrix('value', M_list, deg, n_comp)
 
+    # Total size should be: Elements(2) * Components(2) * Spatial(3) = 12
+    print(f"Matrix Shape: {C.shape}")
+    assert C.shape == (12, 12)
 
+    # Check sparsity pattern to confirm order
+    # With |element>|component>|spatial>,
+    # Element 0 and Element 1 interact.
+    # Within Element 0, Component 0 and Component 1 should NOT interact (diagonal in comp blocks).
+
+    # Get the block for Element 0, Element 0 interaction
+    E00_block = C[0:6, 0:6]
+
+    # This block should be diagonal with respect to components
+    # Top-left (3x3) is Comp 0, Bottom-right (3x3) is Comp 1.
+    # Top-right (3x3) and Bottom-left (3x3) should be zero.
+    off_diag_comp = E00_block[0:3, 3:6]
+
+    print(f"Off-diagonal component block norm: {np.linalg.norm(off_diag_comp)}")
+    assert np.linalg.norm(off_diag_comp) == 0.0, "Components should be decoupled in continuity matrix!"
+
+    print("Test Passed: Structure is |element> |component> |psi>")
 
 

@@ -1,18 +1,20 @@
 from typing import Iterable
 
 import numpy as np
-from src.utils import encoding, derivative_matrix, boundary_matrix, multiply_matrix
+from src.utils import encoding
+from src.utils.basic_operators import derivative_matrix, multiply_matrix
+from src.utils.boundary_hamiltonian import simple_boundary
 from scipy.special import lpmv
 
 def solve_ODE(deg, deg_out, m, l, x_z=None, x_m=None):
-    GT = derivative_matrix.chebyshev_diff_matrix(deg=deg)
+    GT = derivative_matrix.diff_matrix(deg=deg)
     GT_sq = GT @ GT
 
-    M1 = multiply_matrix.M_x_power(deg, 0, deg_out=deg_out)
-    Mx = multiply_matrix.M_x_power(deg, 1, deg_out=deg_out)
-    Mx2 = multiply_matrix.M_x_power(deg, 2, deg_out=deg_out)
-    Mx3 = multiply_matrix.M_x_power(deg, 3, deg_out=deg_out)
-    Mx4 = multiply_matrix.M_x_power(deg, 4, deg_out=deg_out)
+    M1 = multiply_matrix.M_x_power(0, deg, deg_out=deg_out)
+    Mx = multiply_matrix.M_x_power(1, deg, deg_out=deg_out)
+    Mx2 = multiply_matrix.M_x_power(2, deg, deg_out=deg_out)
+    Mx3 = multiply_matrix.M_x_power(3, deg, deg_out=deg_out)
+    Mx4 = multiply_matrix.M_x_power(4, deg, deg_out=deg_out)
 
     if m == 0:
         A = (M1 - Mx2) @ GT_sq - 2 * Mx @ GT + l*(l+1) * M1
@@ -23,21 +25,21 @@ def solve_ODE(deg, deg_out, m, l, x_z=None, x_m=None):
     if x_z is not None:
         if isinstance(x_z, Iterable):
             for xz in x_z:
-                Bz = boundary_matrix.zero_value_boundary_matrix(deg_out, x_z=xz)
+                Bz = boundary_matrix.zero_value_boundary_matrix(x_z=xz, deg=deg_out)
                 Bz_M = Bz @ M1
                 H += Bz_M.T @ Bz_M
         else:
-            Bz = boundary_matrix.zero_value_boundary_matrix(deg_out, x_z=x_z)
+            Bz = boundary_matrix.zero_value_boundary_matrix(x_z=x_z, deg=deg_out)
             Bz_M = Bz @ M1
             H += Bz_M.T @ Bz_M
     if x_m is not None:
         if isinstance(x_m, Iterable):
             for xm in x_m:
-                Bm = boundary_matrix.zero_value_boundary_matrix(deg_out, x_z=xm)
+                Bm = boundary_matrix.zero_value_boundary_matrix(x_z=xm, deg=deg_out)
                 Bm_M_GT = Bm @ M1 @ GT
                 H += Bm_M_GT.T @ Bm_M_GT
         else:
-            Bm = boundary_matrix.zero_value_boundary_matrix(deg_out, x_z=x_m)
+            Bm = boundary_matrix.zero_value_boundary_matrix(x_z=x_m, deg=deg_out)
             Bm_M_GT = Bm @ M1 @ GT
             H += Bm_M_GT.T @ Bm_M_GT
 
