@@ -25,7 +25,7 @@ def R_n(wires: qml.wires.Wires):
     for i in range(len(wires_rev)-2):
         qml.MultiControlledX(wires=wires_rev[:i+3])
 
-def L_n(wires):
+def L_n(wires: qml.wires.Wires):
     """
     L_n: circuit block consisting of Multi-Controlled X gates. n specifies the number of qubits to be acted on.
 
@@ -135,7 +135,6 @@ if __name__ == "__main__":
     np.set_printoptions(linewidth=200)
 
     n = 3
-    prefactor = 3*2**(n-1)
 
     ancs_0 = ["anc_0","anc_1"]
     anc_1 = "anc_2"
@@ -150,16 +149,24 @@ if __name__ == "__main__":
         U_G(n,ancs_0,wires_i,anc_1,wires_j)
         return qml.state()
 
+    print(f"\nThe Chebyshev Differentiation Circuit for n={n}:\n")
     print(qml.draw(circuit,max_length=200)(), "\n")
 
-    GT = derivative_matrix.chebyshev_diff_matrix(deg=2**n-1)
-    norm_G_S = max(np.linalg.norm(GT@GT.T,ord=1),np.linalg.norm(GT.T@GT,ord=1))
-    GT_tilde = GT/norm_G_S
+    GT_appr = qml.matrix(circuit)().real[0:2**n,0:2**n]
 
-    block_matrix = prefactor*qml.matrix(circuit)().real[0:len(GT_tilde),
-                                                        0:len(GT_tilde)]
-    print(f"Block-encoded matrix:\n{block_matrix}", "\n")
-    print(f"Original matrix:\n{GT_tilde}", "\n")
-    print(f"L1 Norm of Error:\n{np.linalg.norm(block_matrix-GT_tilde,ord=1)}")
+    GT_true = derivative_matrix.chebyshev_diff_matrix(deg=2**n-1)
+    print(GT_true.T@GT_true)
+    norm_GT_S = max(np.linalg.norm(GT_true@GT_true.T,ord=1),
+                    np.linalg.norm(GT_true.T@GT_true,ord=1))
 
+    sub_norm_fact = np.sum(GT_true@GT_true)/np.sum(GT_appr@GT_true)
+    sub_norm_fact_true = norm_GT_S*3*2**(n-1)
 
+    print(f"\nBlock-encoded matrix for n={n}:",
+          f"\n{GT_appr}", "\n")
+    print(f"\nOriginal matrix for n={n}:",
+          f"\n{GT_true}", "\n")
+    print(f"\nSub-normalization factor (true, calc) for n={n}:",
+          f"\n({sub_norm_fact_true}, {sub_norm_fact})", "\n")
+    print(f"\nL1 Norm of Error for n={n}:",
+          f"\n{np.linalg.norm(GT_appr*sub_norm_fact-GT_true,ord=1)}", "\n")
