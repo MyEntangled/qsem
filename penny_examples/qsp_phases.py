@@ -5,8 +5,8 @@ from scipy.special import iv
 
 from pyqsp import angle_sequence, response
 
-deg = 14
-t = 15
+deg = 15
+t = 8
 
 func_cosh = lambda x: np.cosh(t*x)/np.exp(t)
 coeffs = np.zeros(2*deg+1)

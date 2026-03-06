@@ -1,18 +1,33 @@
 import numpy as np
+import scipy as sp
 import pennylane as qml
 from pathlib import Path
 # import matplotlib.pyplot as plt
+
+t = 8
+func = lambda x: np.exp(-t*x)/np.exp(t)
 
 data = np.load('qsp_phases.npz')
 phiset_cosh_unmod = data['cosh']
 phiset_sinh_unmod = data['sinh']
 
-H = np.load('hamiltonian.npy')
-print(H.shape)
-# H = np.array([[0.8,0.1,0.1,0.0],
-#               [0.1,0.6,0.0,0.1],
-#               [0.1,0.0,0.4,0.1],
-#               [0.0,0.1,0.1,0.2]])
+# current_path = Path(__file__).resolve()
+# source_dir = current_path.parent.parent.parent / "hamiltonians"
+# source_path = source_dir / "hamiltonian.npy"
+# print(f"Hamiltonian is loaded from: {source_path}")
+# H = np.load(source_path)
+# eigvals, _ = np.linalg.eigh(H)
+# print(f"Largest eigenvalue: {eigvals[-1]}")
+# print(f"2nd smallest eigenvalue: {eigvals[1]}")
+H = np.array([[0.8,0.1,0.1,0.0],
+              [0.1,0.6,0.0,0.1],
+              [0.1,0.0,0.4,0.1],
+              [0.0,0.1,0.1,0.2]])
+n_qubits = int(np.ceil(np.log2(len(H))))
+eigvals, eigvecs = np.linalg.eigh(H)
+exp_eig = func(eigvals)
+print(f"\nEigenvalues: {eigvals}","\n")
+print(f"\nexp(-{t}*eigval)/exp({t}): {exp_eig}","\n")
 
 def transform_phases(phiset_in):
     phiset = phiset_in.copy()
@@ -67,31 +82,30 @@ def im_qsvt_exp(H,ancs,regs):
     qml.X(wires=anc1)
     qml.RZ(np.pi,wires=anc1)
 
-ancs = ["a1","a2","a3"]
-regs = [f"q{i}" for i in range(1,6)]
+ancs = ["a0","a1","a2"]
+regs = [f"q{i}" for i in range(n_qubits)]
 dev = qml.device("lightning.gpu", wires=[*ancs,*regs])
 @qml.qnode(dev)
 def circuit():
-    for reg in regs:
-        qml.Hadamard(wires=reg)
-
     im_qsvt_exp(H,ancs,regs)
     return qml.state()
 
-print(qml.matrix(circuit)()[:32,:32].real)
+print(f"\nCalculated exp(-{t}H)/exp({t}) using QSVT:\n")
+print(qml.matrix(circuit)()[:len(H),:len(H)].real,"\n")
+print(f"\nCalculated exp(-{t}H)/exp({t}) using scipy",
+      "with post normalization factor of 2:", "\n")
+print(sp.linalg.expm(-8*H) / np.exp(8)/2,"\n")
 
-full_state = circuit()
-unnorm_ground_state = full_state[:32]
-
-norm = np.linalg.norm(unnorm_ground_state)
-groud_state = unnorm_ground_state / norm
-
-print(groud_state.real)
-
-# Save the ground state
-current_path = Path(__file__).resolve()
-target_dir = current_path.parent
-file_path = target_dir / "ground_state.npy"
-np.save(file_path, groud_state.real)
-print(f"Ground state is saved to: {file_path}")
-
+# full_state = circuit()
+# unnorm_ground_state = full_state[:32]
+# 
+# norm = np.linalg.norm(unnorm_ground_state)
+# groud_state = unnorm_ground_state / norm
+# 
+# # print(groud_state.real)
+# 
+# # Save the ground state
+# target_dir = current_path.parent
+# target_path = target_dir / "ground_state.npy"
+# np.save(target_path, groud_state.real)
+# print(f"Ground state is saved to: {target_path}")
