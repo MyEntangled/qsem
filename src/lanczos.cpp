@@ -52,9 +52,17 @@ struct LanczosDecomposition {
     std::vector<std::vector<double>> basis;
 };
 
-// std::vector<double> re_orthogonalize(){
-
-// }
+void reorthogonalize_against_basis(std::vector<double>& vec, const std::vector<std::vector<double>>& basis){
+    for (int pass = 0; pass < 2; pass++){
+        for (const auto& q : basis){
+            const double projection = compute_inner_product(vec, q);
+            #pragma omp parallel for
+            for (std::size_t i = 0; i < vec.size(); i++){
+                vec[i] -= projection * q[i];
+            }
+        }
+    }
+}
 
 LanczosDecomposition lanczos(const std::vector<double>& __restrict__ matrix_data, const std::vector<int>& __restrict__ row_idx, const std::vector<int>& __restrict__ row_ptr, const std::vector<double>& x0, const int max_iter){
     const std::size_t mat_size = row_ptr.size() - 1;
@@ -81,6 +89,9 @@ LanczosDecomposition lanczos(const std::vector<double>& __restrict__ matrix_data
         for (std::size_t i = 0; i < mat_size; i++){
             v[i] -= alpha * qk[i] + beta * q0[i];
         }
+
+        reorthogonalize_against_basis(v, basis);
+
         beta = compute_L2_norm(v);
         coefficients.push_back({alpha, beta});
         if (beta < 1e-10){
@@ -94,23 +105,6 @@ LanczosDecomposition lanczos(const std::vector<double>& __restrict__ matrix_data
     }
     return {coefficients, basis};
 }
-
-// std::vector<std::vector<double>> build_tridiagonal_matrix(const std::vector<std::vector<double>>& lanczos_results){
-//     const std::size_t size = lanczos_results.size();
-//     std::vector<std::vector<double>> tridiagonal(size, std::vector<double>(size, 0.0));
-//     for (std::size_t i = 0; i < size; i++){
-//         tridiagonal[i][i] = lanczos_results[i][0];
-//         if (i > 0 && i < size - 1){
-//             tridiagonal[i][i-1] = lanczos_results[i][1];
-//             tridiagonal[i-1][i] = lanczos_results[i][1];
-//         }
-//         if (i == size - 1){
-//             tridiagonal[i][i-1] = lanczos_results[i][1];
-//             tridiagonal[i-1][i] = lanczos_results[i][1];
-//         }
-//     }
-//     return tridiagonal;
-// }
 
 std::pair<std::vector<double>, std::vector<std::vector<double>>> compute_m_eigenpairs(const std::vector<std::vector<double>>& lanczos_results, int num_eigenvalues, const bool find_max){
     int n = static_cast<int>(lanczos_results.size());
