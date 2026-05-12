@@ -1,28 +1,32 @@
 import numpy as np
 
 def chebyshev_nodes(deg):
-    xj = [np.cos(np.pi * (j+0.5) / (deg + 1)) for j in range(deg + 1)]
-    return np.array(xj)
+    """
+    Roots of T_{d+1}(x).
+    """
+    n = deg + 1
+    j = np.arange(n, dtype=float)
+    return np.cos((2.0 * j + 1.0) * np.pi / (2.0 * n))
 
 def chebyshev_encoding(deg, x):
     """
     Encodes the input x into Chebyshev polynomial basis up to degree deg.
     Returns a vector of size (deg + 1) with coefficients for T_0, T_1, ..., T_deg.
     """
-    tau = np.zeros(deg + 1)
-    scale = 1.0 / np.sqrt(deg + 1)
-    for k in range(deg + 1):
-        if k == 0:
-            tau[k] = 1.0
-        elif k == 1:
-            tau[k] = x
-        else:
-            tau[k] = 2 * x * tau[k - 1] - tau[k - 2]
+    # Strategy 1C: vectorized Chebyshev recurrence (no Python loop)
+    tau = np.empty(deg + 1)
+    tau[0] = 1.0
+    if deg >= 1:
+        tau[1] = x
+    if deg >= 2:
+        two_x = 2.0 * x
+        for k in range(2, deg + 1):
+            tau[k] = two_x * tau[k - 1] - tau[k - 2]
 
+    scale = 1.0 / np.sqrt(deg + 1)
     tau[0] *= scale
     tau[1:] *= scale * np.sqrt(2)
 
-    #print("Norm of Chebyshev encoding vector:", np.linalg.norm(tau))
     return tau
 
 if __name__ == "__main__":

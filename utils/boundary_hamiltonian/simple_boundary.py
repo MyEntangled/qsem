@@ -1,6 +1,21 @@
 import numpy as np
+from functools import lru_cache
 from src.utils import encoding
 from src.utils.basic_operators import derivative_matrix, multiply_matrix
+
+
+# ---------------------------------------------------------------------------
+# Cached operator factories (Strategy 1B)
+# ---------------------------------------------------------------------------
+@lru_cache(maxsize=64)
+def _cached_M1(deg: int, deg_out: int) -> np.ndarray:
+    """Cached degree-lifting matrix M_x_power(p=0, deg, deg_out)."""
+    return multiply_matrix.M_x_power(p=0, deg=deg, deg_out=deg_out)
+
+@lru_cache(maxsize=64)
+def _cached_diff(deg: int) -> np.ndarray:
+    """Cached Chebyshev differentiation matrix."""
+    return derivative_matrix.diff_matrix(deg, deg_out=None)
 
 
 def zero_value_boundary_matrix(x_z: float, deg: int, deg_out: int = None):
@@ -35,19 +50,20 @@ def zero_value_boundary_matrix(x_z: float, deg: int, deg_out: int = None):
             If `deg_out < deg`.
         """
     d = deg
-    B = np.zeros((d + 1, d + 1))
-
     tau = encoding.chebyshev_encoding(deg, x_z)
 
-    B[0, :] = tau
-    B *= np.sqrt(d + 1)
+    # Strategy 1A: construct rank-1 matrix directly as sqrt(d+1) * |e0><tau|
+    # instead of allocating a full (d+1)x(d+1) zero matrix.
+    e0 = np.zeros(d + 1)
+    e0[0] = 1.0
+    B = np.sqrt(d + 1) * np.outer(e0, tau)
 
     if deg_out is None:
         return B
     else:
         if deg_out < deg:
             raise ValueError("deg_out must be greater than or equal to deg.")
-        M1 = multiply_matrix.M_x_power(p=0, deg=deg, deg_out=deg_out)
+        M1 = _cached_M1(deg, deg_out)
         return M1 @ B
 
 def zero_derivative_boundary_matrix(x_m: float, deg: int, deg_out: int = None):
@@ -83,14 +99,14 @@ def zero_derivative_boundary_matrix(x_m: float, deg: int, deg_out: int = None):
         """
 
     B = zero_value_boundary_matrix(x_m, deg)
-    B_hat = B @ derivative_matrix.diff_matrix(deg, deg_out=None)
+    B_hat = B @ _cached_diff(deg)
 
     if deg_out is None:
         return B_hat
     else:
         if deg_out < deg:
             raise ValueError("deg_out must be greater than or equal to deg.")
-        M1 = multiply_matrix.M_x_power(p=0, deg=deg, deg_out=deg_out)
+        M1 = _cached_M1(deg, deg_out)
         return M1 @ B_hat
 
 def regular_value_boundary_matrix(x_s: float, y_s: float, deg: int, deg_out: int = None):
@@ -140,7 +156,7 @@ def regular_value_boundary_matrix(x_s: float, y_s: float, deg: int, deg_out: int
     else:
         if deg_out < deg:
             raise ValueError("deg_out must be greater than or equal to deg.")
-        M1 = multiply_matrix.M_x_power(p=0, deg=deg, deg_out=deg_out)
+        M1 = _cached_M1(deg, deg_out)
         return M1 @ D0
 
 def regular_derivative_boundary_matrix(x_s: float, t_s: float, deg: int, deg_out: int = None):
@@ -189,7 +205,7 @@ def regular_derivative_boundary_matrix(x_s: float, t_s: float, deg: int, deg_out
     else:
         if deg_out < deg:
             raise ValueError("deg_out must be greater than or equal to deg.")
-        M1 = multiply_matrix.M_x_power(p=0, deg=deg, deg_out=deg_out)
+        M1 = _cached_M1(deg, deg_out)
         return M1 @ D1
 
 def build_boundary_matrix(type: str, x: float, y: float, deg: int, deg_out: int = None):

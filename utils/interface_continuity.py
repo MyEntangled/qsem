@@ -1,10 +1,12 @@
 import numpy as np
+from scipy.sparse import lil_matrix, csr_matrix
 
 from src.utils.basic_operators import multiply_matrix
 from src.utils.boundary_hamiltonian.simple_boundary import build_boundary_matrix
+from src.utils.eigensolvers.lanczos_solver import pylanczos_solve
 
 
-def boundary_continuity_matrice(type: str, M: int, deg: int, deg_out: int = None):
+def boundary_continuity_matrice(type: str, M: int, deg: int, deg_out: int = None, sparse: bool = False):
     """Assemble the 1D boundary_hamiltonian penalty matrix across element interfaces.
 
     This function constructs a global block matrix enforcing boundary_hamiltonian conditions
@@ -52,24 +54,49 @@ def boundary_continuity_matrice(type: str, M: int, deg: int, deg_out: int = None
     B_rr = B_right.T @ B_right
     B_lr = B_left.T @ B_right
     B_rl = B_right.T @ B_left
-
-    C = np.zeros(((deg+1)*M, (deg+1)*M))
+    
+    if sparse:
+        B_ll = csr_matrix(B_ll)
+        B_rr = csr_matrix(B_rr)
+        B_lr = csr_matrix(B_lr)
+        B_rl = csr_matrix(B_rl)
+        C = lil_matrix(((deg+1)*M, (deg+1)*M))
+    else:
+        C = np.zeros(((deg+1)*M, (deg+1)*M))
 
     for i in range(M):
         for j in range(M):
             if i == j - 1:
                 C_ij = - B_rl
             elif i == j:
-                C_ij = B_rr * (i < M-1) + B_ll * (i > 0)
+                if sparse:
+                     # For sparse matrices, we need careful addition to avoid dense intermediate
+                     # if i < M-1 and i > 0, it's B_rr + B_ll.
+                     if i < M-1 and i > 0:
+                         C_ij = B_rr + B_ll
+                     elif i < M-1: # i=0
+                         C_ij = B_rr
+                     elif i > 0: # i=M-1
+                         C_ij = B_ll
+                     else: # M=1 case
+                         C_ij = csr_matrix((deg+1, deg+1))
+                else:
+                    C_ij = B_rr * (i < M-1) + B_ll * (i > 0)
             elif i == j + 1:
                 C_ij = - B_lr
             else:
-                C_ij = np.zeros((deg+1, deg+1))
+                if not sparse:
+                    C_ij = np.zeros((deg+1, deg+1))
+                else:
+                    continue
 
             C[i*(deg+1) : (i+1)*(deg+1), j*(deg+1) : (j+1)*(deg+1)] = C_ij
+            
+    if sparse:
+        return C.tocsr()
     return C
 
-def boundary_continuity_matrice_alternative(type: str, M: int, deg: int, deg_out: int = None):
+def boundary_continuity_matrice_alternative(type: str, M: int, deg: int, deg_out: int = None, sparse: bool = False):
     """Assemble the 1D boundary_hamiltonian penalty matrix across element interfaces.
 
     This function constructs a global block matrix enforcing boundary_hamiltonian conditions
@@ -115,15 +142,31 @@ def boundary_continuity_matrice_alternative(type: str, M: int, deg: int, deg_out
 
     #  H = sum_e C_{e, e+1}^T C_{e, e+1}, where
     #  C_{e, e+1} = |e\rangle\langle e| \otimes B_n(1) - |e\rangle\langle e+1| \otimes B_n(-1)
-    C = np.zeros(((deg+1)*M, (deg+1)*M))
+    
+    if sparse:
+        C = lil_matrix(((deg+1)*M, (deg+1)*M))
+        # Pre-convert for efficiency
+        B_right_s = csr_matrix(B_right)
+        B_left_s = csr_matrix(B_left)
+    else:
+        C = np.zeros(((deg+1)*M, (deg+1)*M))
 
     for e in range(M-1):
-        C_e = np.zeros(((deg_out+1)*M, (deg+1)*M))
-        C_e[e*(deg_out+1) : (e+1)*(deg_out+1), e*(deg+1) : (e+1)*(deg+1)] = B_right
-        C_e[e*(deg_out+1) : (e+1)*(deg_out+1), (e+1)*(deg+1) : (e+2)*(deg+1)] = -B_left
+        if sparse:
+            C_e = lil_matrix(((deg_out+1)*M, (deg+1)*M))
+            C_e[e*(deg_out+1) : (e+1)*(deg_out+1), e*(deg+1) : (e+1)*(deg+1)] = B_right_s
+            C_e[e*(deg_out+1) : (e+1)*(deg_out+1), (e+1)*(deg+1) : (e+2)*(deg+1)] = -B_left_s
+            # Convert to CSR for multiplication
+            C_e_csr = C_e.tocsr()
+            C += C_e_csr.T @ C_e_csr
+        else:
+            C_e = np.zeros(((deg_out+1)*M, (deg+1)*M))
+            C_e[e*(deg_out+1) : (e+1)*(deg_out+1), e*(deg+1) : (e+1)*(deg+1)] = B_right
+            C_e[e*(deg_out+1) : (e+1)*(deg_out+1), (e+1)*(deg+1) : (e+2)*(deg+1)] = -B_left
+            C += C_e.T @ C_e
 
-        C += C_e.T @ C_e
-
+    if sparse:
+        return C.tocsr()
     return C
 
 
@@ -131,9 +174,10 @@ def boundary_continuity_matrice_alternative(type: str, M: int, deg: int, deg_out
 
 def multivar_boundary_continuity_matrix(
     type: str,
-    M_list: list,
+    M_list: list|np.ndarray,
     deg: int,
     deg_out: int = None,
+    sparse: bool = False
 ):
     """Assemble the nD boundary_hamiltonian penalty matrix across element interfaces.
 
@@ -245,7 +289,15 @@ def multivar_boundary_continuity_matrix(
     Q_rl = [B_face_right[v].T @ B_face_left[v] for v in range(num_variables)]
     Q_lr = [B_face_left[v].T @ B_face_right[v] for v in range(num_variables)]
 
-    C = np.zeros((in_block * M, in_block * M))
+    if sparse:
+        C = lil_matrix((in_block * M, in_block * M))
+        # Convert blocks to CSR for efficient addition
+        Q_rr = [csr_matrix(q) for q in Q_rr]
+        Q_ll = [csr_matrix(q) for q in Q_ll]
+        Q_rl = [csr_matrix(q) for q in Q_rl]
+        Q_lr = [csr_matrix(q) for q in Q_lr]
+    else:
+        C = np.zeros((in_block * M, in_block * M))
 
     # Loop over all interior interfaces along each dimension.
     # For each interface (left element e, right element f):
@@ -275,6 +327,8 @@ def multivar_boundary_continuity_matrix(
             C[e0:e1, f0:f1] += -Q_rl[v]
             C[f0:f1, e0:e1] += -Q_lr[v]
 
+    if sparse:
+        return C.tocsr()
     return C
 
 
@@ -285,6 +339,7 @@ def vector_multivar_boundary_continuity_matrix(
         num_components: int,
         deg: int,
         deg_out: int = None,
+        sparse: bool = False
 ):
     """
     Assemble the nD boundary continuity matrix for vector-valued functions.
@@ -323,8 +378,8 @@ def vector_multivar_boundary_continuity_matrix(
     # --- 1. Construct Scalar Spatial Operators ---
     # These act on |psi_spatial>
 
-    B_left_1d = boundary_matrix.build_boundary_matrix(type, x=-1, y=None, deg=deg, deg_out=deg_out)
-    B_right_1d = boundary_matrix.build_boundary_matrix(type, x=1, y=None, deg=deg, deg_out=deg_out)
+    B_left_1d = build_boundary_matrix(type, x=-1, y=None, deg=deg, deg_out=deg_out)
+    B_right_1d = build_boundary_matrix(type, x=1, y=None, deg=deg, deg_out=deg_out)
     M1 = multiply_matrix.M_x_power(0, deg, deg_out)  # Identity lift
 
     spatial_in_size = (deg + 1) ** num_variables
@@ -365,13 +420,24 @@ def vector_multivar_boundary_continuity_matrix(
     Q_ll = [np.kron(I_comp, q) for q in q_ll_scalar]
     Q_rl = [np.kron(I_comp, q) for q in q_rl_scalar]
     Q_lr = [np.kron(I_comp, q) for q in q_lr_scalar]
+    
+    if sparse:
+         # Convert blocks to CSR
+        Q_rr = [csr_matrix(q) for q in Q_rr]
+        Q_ll = [csr_matrix(q) for q in Q_ll]
+        Q_rl = [csr_matrix(q) for q in Q_rl]
+        Q_lr = [csr_matrix(q) for q in Q_lr]
 
     # --- 3. Assemble Global Matrix ---
     # Target Structure: |element> |component> |spatial>
 
     M_total = int(np.prod(N))
     block_size = num_components * spatial_in_size
-    C = np.zeros((block_size * M_total, block_size * M_total))
+    
+    if sparse:
+        C = lil_matrix((block_size * M_total, block_size * M_total))
+    else:
+        C = np.zeros((block_size * M_total, block_size * M_total))
 
     # Helper for strides
     strides = [1] * num_variables
@@ -405,32 +471,35 @@ def vector_multivar_boundary_continuity_matrix(
             C[f0:f1, f0:f1] += Q_ll[v]
             C[e0:e1, f0:f1] += -Q_rl[v]
             C[f0:f1, e0:e1] += -Q_lr[v]
-
+    
+    if sparse:
+        return C.tocsr()
     return C
 
 
 if __name__ == '__main__':
+    import scipy
     M = 4
     n = 2
     deg = 2**n - 1
     deg_out = 2**(n) - 1
-    C0 = boundary_continuity_matrice('value', M, deg, deg_out=deg_out)
-    C1 = boundary_continuity_matrice('derivative', M, deg, deg_out=deg_out)
+    C0 = boundary_continuity_matrice('value', M, deg, deg_out=deg_out, sparse=True)
+    C1 = boundary_continuity_matrice('derivative', M, deg, deg_out=deg_out, sparse=True)
 
-    C0_new = boundary_continuity_matrice_alternative('value', M, deg, deg_out=deg_out)
-    C1_new = boundary_continuity_matrice_alternative('derivative', M, deg, deg_out=deg_out)
-    print("Difference in C0:", np.linalg.norm(C0 - C0_new))
-    print("Difference in C1:", np.linalg.norm(C1 - C1_new))
+    C0_new = boundary_continuity_matrice_alternative('value', M, deg, deg_out=deg_out, sparse=True)
+    C1_new = boundary_continuity_matrice_alternative('derivative', M, deg, deg_out=deg_out, sparse=True)
+    print("Difference in C0:", scipy.sparse.linalg.norm(C0 - C0_new))
+    print("Difference in C1:", scipy.sparse.linalg.norm(C1 - C1_new))
 
     print("C0 shape:", C0.shape)
     print("C1 shape:", C1.shape)
-    print("Commutator [C0,C1] norm:", np.linalg.norm(C0 @ C1 - C1 @ C0))
-    print("Commutator [C0_new,C1_new] norm:", np.linalg.norm(C0_new @ C1_new - C1_new @ C0_new))
+    print("Commutator [C0,C1] norm:", scipy.sparse.linalg.norm(C0 @ C1 - C1 @ C0))
+    print("Commutator [C0_new,C1_new] norm:", scipy.sparse.linalg.norm(C0_new @ C1_new - C1_new @ C0_new))
 
     ## Check lowest eigenvalue and the rank of the eigenspace corresponding to the lowest eigenvalue.
     # We expect the lowest eigenvalue to be 0.
-    eigvals_0, eigvecs_0 = np.linalg.eigh(C0)
-    eigvals_1, eigvecs_1 = np.linalg.eigh(C1)
+    eigvals_0, eigvecs_0 = pylanczos_solve(C0, C0.shape[0], False)
+    eigvals_1, eigvecs_1 = pylanczos_solve(C1, C1.shape[0], False)
     print(eigvals_0[eigvals_0 > 1e-10])
     print(eigvals_1[eigvals_1 > 1e-10])
 
@@ -440,7 +509,7 @@ if __name__ == '__main__':
     print(f"Number of zero eigenvalues in C0: {zero_eigvals_0}")
     print(f"Number of zero eigenvalues in C1: {zero_eigvals_1}")
 
-    print("Norm of C0 and C1", np.linalg.norm(C0), np.linalg.norm(C1))
+    print("Norm of C0 and C1", scipy.sparse.linalg.norm(C0), scipy.sparse.linalg.norm(C1))
 
     eigvecs_0_zero = eigvecs_0[:, :zero_eigvals_0]
     eigvecs_1_zero = eigvecs_1[:, :zero_eigvals_1]
@@ -452,8 +521,8 @@ if __name__ == '__main__':
     from src.utils import encoding
 
     C = C0_new + C1_new
-    eigvals, eigvecs = np.linalg.eigh(C)
-    print(eigvals)
+    eigvals, eigvecs = pylanczos_solve(C, C.shape[0], False)
+
     tol = 1e-10
     zero_eigvals = np.sum(eigvals < tol)
     print(f"Number of zero eigenvalues in C0 + C1: {zero_eigvals}")
@@ -498,7 +567,7 @@ if __name__ == '__main__':
     deg = 2
     n_comp = 2  # u, v
 
-    C = vector_multivar_boundary_continuity_matrix('value', M_list, deg, n_comp)
+    C = vector_multivar_boundary_continuity_matrix('value', M_list, deg, n_comp, sparse=False)
 
     # Total size should be: Elements(2) * Components(2) * Spatial(3) = 12
     print(f"Matrix Shape: {C.shape}")
@@ -516,10 +585,9 @@ if __name__ == '__main__':
     # Top-left (3x3) is Comp 0, Bottom-right (3x3) is Comp 1.
     # Top-right (3x3) and Bottom-left (3x3) should be zero.
     off_diag_comp = E00_block[0:3, 3:6]
+    print(off_diag_comp)
 
     print(f"Off-diagonal component block norm: {np.linalg.norm(off_diag_comp)}")
     assert np.linalg.norm(off_diag_comp) == 0.0, "Components should be decoupled in continuity matrix!"
 
     print("Test Passed: Structure is |element> |component> |psi>")
-
-

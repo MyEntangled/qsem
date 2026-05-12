@@ -1,34 +1,6 @@
 import numpy as np
 import warnings
 
-def get_weight(k: int, deg: int):
-    """
-    Return the coefficient of T_k in the generalized Chebyshev encoding
-    tau_deg(x) = (T_0(x), sqrt(2) T_1(x), ..., sqrt(2) T_deg(x))^T / sqrt(deg+1).
-
-    Parameters
-    ----------
-    k : int
-        Chebyshev degree index (0 <= k <= deg).
-    deg : int
-        Maximum Chebyshev degree of the encoding.
-
-    Returns
-    -------
-    w : float
-        The scalar weight such that the k-th component of tau_deg(x) is
-        w * T_k(x).
-    """
-    if k < 0 or k > deg:
-        raise ValueError("k must satisfy 0 <= k <= deg.")
-
-    norm = np.sqrt(deg + 1.0)
-    if k == 0:
-        return 1.0 / norm
-    else:
-        return np.sqrt(2.0) / norm
-
-
 def climbing_matrix(deg: int):
     """
     Construct the multiplication matrix M_x for the generalized Chebyshev encoding
