@@ -1,0 +1,5 @@
+__pycache__/
+*.py[cod]
+
+hiwiLib.egg-info/
+*.egg-info/
