@@ -50,7 +50,7 @@ def solve_ODE(deg, deg_out, m, l, x_z=None, x_m=None):
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     m, l = 0, 5
-    n = 3
+    n = 7
     deg = 2**n-1
     deg_out = 2**(n+1) - 1
 

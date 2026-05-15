@@ -1,0 +1,74 @@
+import numpy as np
+from src.utils import derivative_matrix, boundary_matrix, encoding
+
+def chebyshev_int_matrix_taotao(deg):
+    I = np.array([1/(1-(i+j)**2) + 1/(1-(i-j)**2) if (i+j)%2 == 0 else 0
+         for i in range(deg+1)
+         for j in range(deg+1)])
+    tau = encoding.chebyshev_encoding(deg=deg, x=1)
+    return np.kron(tau,tau)*I
+
+def solve_Poisson(deg,xs,ys):
+    GTn = derivative_matrix.chebyshev_diff_matrix(deg=deg)
+    ITn = chebyshev_int_matrix_taotao(deg=deg)
+    In = np.eye(deg+1)
+    Dn = boundary_matrix.regular_value_boundary_matrix(deg=deg,x_s=xs,y_s=ys)
+
+    tau_m1 = encoding.chebyshev_encoding(deg=deg, x=-1)
+    tau_p1 = encoding.chebyshev_encoding(deg=deg, x=1)
+    B = np.array([tau_m1,tau_p1])
+    _,_,Vh = np.linalg.svd(B)
+    Z = Vh[2:].T
+
+    v = ITn @ (np.kron(GTn,GTn) - np.kron(In,Dn)) # ((deg+1)^2,1)
+    V = v.reshape(deg+1,deg+1) # (deg+1,deg+1)
+    W = Z.T @ V @ Z
+
+    eigvals, eigvecs = np.linalg.eig(W)
+    print(eigvals)
+    w = eigvecs[:,-5]
+    u = Z @ w
+    return u
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+    np.set_printoptions(linewidth=200)
+
+    def true_f(x):
+        return 0.5 - 0.5*x*x
+
+    n = 4
+    deg = 2**n-1
+    xs, ys = 0, true_f(0)
+
+    def tau_n(x):
+        return encoding.chebyshev_encoding(deg=deg, x=x)
+
+    u = solve_Poisson(deg,xs,ys)
+
+    s_eta = ys/np.dot(tau_n(xs),u)
+    eta = s_eta*s_eta
+
+    def appr_f(x):
+        return s_eta*np.dot(tau_n(x),u)
+
+    # Plot the solution
+    x_plot = np.linspace(-1, 1, 200)
+    true_f_plot = []
+    appr_f_plot = []
+    for x in x_plot:
+        true_f_plot.append(true_f(x))
+        appr_f_plot.append(appr_f(x))
+    errorL2 = np.sqrt(2*np.sum((np.array(true_f_plot)-
+                                np.array(appr_f_plot))**2)/200)
+    print(errorL2)
+    plt.plot(x_plot, true_f_plot, label='true_f')
+    plt.plot(x_plot, appr_f_plot, label='appr_f')
+    plt.title("Solution to ODE")
+    plt.xlabel("x")
+    plt.xlim(-1,1)
+    plt.ylabel("f(x)")
+    plt.ylim(-1,1)
+    plt.grid()
+    plt.legend()
+    plt.show()
