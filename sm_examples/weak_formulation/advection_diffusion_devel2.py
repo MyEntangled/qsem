@@ -46,7 +46,7 @@ if __name__ == "__main__":
     def true_f(x):
         return 0.4*(x+1-2*(np.exp((x+1)/0.1)-1)/(np.exp(2/0.1)-1))
 
-    n = 4
+    n = 3
     deg = 2**n-1
     xs, ys = 0, true_f(0)
     boundaries = ((-1,true_f(-1)),(1,true_f(1)))

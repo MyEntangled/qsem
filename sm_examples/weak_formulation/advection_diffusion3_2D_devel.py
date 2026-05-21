@@ -5,7 +5,7 @@ from src.utils.boundary_matrix import zero_value_boundary_matrix
 from src.utils.derivative_matrix import chebyshev_diff_matrix
 from src.utils.encoding import chebyshev_encoding
 from src.utils.multiply_matrix import M_x_power
-from src.utils.weak_formulation import chebyshev_int_state, constract_iota_state, construct_boundary_matrix, test_basis_matrix
+from src.utils.weak_formulation import chebyshev_int_state, constract_iota_state, construct_boundary_matrix_2D, test_basis_matrix
 
 from src.utils.chebyshev_approximations import sin_cheb_appr, exp_cheb_appr
 
@@ -63,10 +63,10 @@ def solve_DE(deg,deg_out,xs,ys,fs,lam):
     c4 = 0.2*np.sin(1)/np.dot(chebyshev_encoding(deg,0),g_exp)
     g4 = c4*g_exp
 
-    B1 = construct_boundary_matrix(deg,xs,ys,fs,-1,None,g1,lam)
-    B2 = construct_boundary_matrix(deg,xs,ys,fs,1,None,g2,lam)
-    B3 = construct_boundary_matrix(deg,xs,ys,fs,None,-1,g3,lam)
-    B4 = construct_boundary_matrix(deg,xs,ys,fs,None,1,g4,lam)
+    B1 = construct_boundary_matrix_2D(deg,xs,ys,fs,0,-1,None,g1,lam)
+    B2 = construct_boundary_matrix_2D(deg,xs,ys,fs,0,1,None,g2,lam)
+    B3 = construct_boundary_matrix_2D(deg,xs,ys,fs,0,None,-1,g3,lam)
+    B4 = construct_boundary_matrix_2D(deg,xs,ys,fs,0,None,1,g4,lam)
 
     H = A + B1 + B2 + B3 + B4
 

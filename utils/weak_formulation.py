@@ -1,4 +1,5 @@
 import numpy as np
+from src.utils.derivative_matrix import chebyshev_diff_matrix
 from src.utils.encoding import chebyshev_encoding
 from functools import reduce
 
@@ -21,15 +22,36 @@ def constract_iota_state(iota, mats):
         res = np.tensordot(res,mats[i],axes=([0],[0]))
     return res.flatten()
 
-def construct_boundary_matrix(deg,xs,ys,fs,xb,yb,g,lam=1):
+def construct_boundary_matrix_1D(deg,xs,fs,ddeg,xb,g,lam=1):
+    C = np.linalg.matrix_power(chebyshev_diff_matrix(deg),ddeg)
+    n = deg+1
+
+    B = np.zeros((n,n))
+    tau_xb = C.T @ chebyshev_encoding(deg=deg, x=xb)
+
+    ## Term 1
+    term1 = fs*fs*np.outer(tau_xb,tau_xb)
+    B += term1
+
+    if g is not None:
+        tau_xs = chebyshev_encoding(deg=deg, x=xs)
+    ## Term 2
+        term2 = fs * g * np.outer(tau_xb,tau_xs)
+        B -= (term2+term2.T)
+
+    ## Term 3
+        term3 = np.sum(g*g) * np.outer(tau_xs,tau_xs)
+        B += term3
+    return lam*B
+
+def construct_boundary_matrix_2D(deg,xs,ys,fs,ddeg,xb,yb,g,lam=1):
+    C = np.linalg.matrix_power(chebyshev_diff_matrix(deg),ddeg)
     n = deg+1
     N = n*n
-    tau_xs = chebyshev_encoding(deg=deg, x=xs)
-    tau_ys = chebyshev_encoding(deg=deg, x=ys)
 
     B = np.zeros((N,N))
     if xb is not None:
-        tau_xb = chebyshev_encoding(deg=deg, x=xb)
+        tau_xb = C.T @ chebyshev_encoding(deg=deg, x=xb)
 
         ## Term 1
         B_view = B.reshape(n,n,n,n)
@@ -38,6 +60,8 @@ def construct_boundary_matrix(deg,xs,ys,fs,xb,yb,g,lam=1):
             B_view[:,i,:,i] = block
 
         if g is not None:
+            tau_xs = chebyshev_encoding(deg=deg, x=xs)
+            tau_ys = chebyshev_encoding(deg=deg, x=ys)
         ## Term 2
             v_target = np.outer(tau_xb,g).flatten()
             v_global = np.outer(tau_xs,tau_ys).flatten()
@@ -49,7 +73,7 @@ def construct_boundary_matrix(deg,xs,ys,fs,xb,yb,g,lam=1):
             B += term3
 
     else:
-        tau_yb = chebyshev_encoding(deg=deg, x=yb)
+        tau_yb = C.T @ chebyshev_encoding(deg=deg, x=yb)
 
         ## Term 1
         block = fs*fs*np.outer(tau_yb,tau_yb)
@@ -57,6 +81,8 @@ def construct_boundary_matrix(deg,xs,ys,fs,xb,yb,g,lam=1):
             B[i*n:(i+1)*n,i*n:(i+1)*n] = block
 
         if g is not None:
+            tau_xs = chebyshev_encoding(deg=deg, x=xs)
+            tau_ys = chebyshev_encoding(deg=deg, x=ys)
         ## Term 2
             v_target = np.outer(g,tau_yb).flatten()
             v_global = np.outer(tau_xs,tau_ys).flatten()

@@ -5,7 +5,7 @@ from src.utils.boundary_matrix import zero_value_boundary_matrix
 from src.utils.derivative_matrix import chebyshev_diff_matrix
 from src.utils.encoding import chebyshev_encoding
 from src.utils.multiply_matrix import M_x_power
-from src.utils.weak_formulation import chebyshev_int_state, constract_iota_state, construct_boundary_matrix, test_basis_matrix
+from src.utils.weak_formulation import chebyshev_int_state, constract_iota_state, construct_boundary_matrix_2D, test_basis_matrix
 
 def solve_DE(deg,deg_out,xs,ys,fs,lam=1):
     M1 = M_x_power(deg, 0, deg_out=deg_out)
@@ -47,10 +47,10 @@ def solve_DE(deg,deg_out,xs,ys,fs,lam=1):
     Z_2D = np.kron(Z_1D,Z_1D)
     A = C @ Z_2D @ Z_2D.T @ C.T
 
-    B1 = construct_boundary_matrix(deg,xs,ys,fs,-1,None,None,lam)
-    B2 = construct_boundary_matrix(deg,xs,ys,fs,1,None,None,lam)
-    B3 = construct_boundary_matrix(deg,xs,ys,fs,None,-1,None,lam)
-    B4 = construct_boundary_matrix(deg,xs,ys,fs,None,1,None,lam)
+    B1 = construct_boundary_matrix_2D(deg,xs,ys,fs,0,-1,None,None,lam)
+    B2 = construct_boundary_matrix_2D(deg,xs,ys,fs,0,1,None,None,lam)
+    B3 = construct_boundary_matrix_2D(deg,xs,ys,fs,0,None,-1,None,lam)
+    B4 = construct_boundary_matrix_2D(deg,xs,ys,fs,0,None,1,None,lam)
 
     H = A + B1 + B2 + B3 + B4
 
